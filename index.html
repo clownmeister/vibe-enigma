@@ -69,10 +69,12 @@
   .lbl{font-size:11px;color:#8d8d8d;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
   .rotors{display:flex;gap:14px}
   .rotor{display:grid;grid-template-rows:auto auto auto auto;justify-items:center;gap:6px;width:78px}
-  .drum{width:100%;height:84px;perspective:420px;overflow:hidden;border:1.5px solid #6a5a3a;border-radius:3px;background:#000;position:relative;cursor:ns-resize;user-select:none}
+  .drum{width:100%;height:84px;perspective:420px;overflow:hidden;border:1.5px solid #6a5a3a;border-radius:3px;background:#000;position:relative;cursor:grab;user-select:none;touch-action:none}
+  .drum.dragging{cursor:grabbing}
+  .drum.dragging .cyl{transition:transform .06s linear}
   .drum::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(#000 0,transparent 32%,transparent 68%,#000 100%)}
   .drum::before{content:"";position:absolute;left:0;right:0;top:50%;height:28px;margin-top:-14px;border-top:1px solid #3a3a3a;border-bottom:1px solid #3a3a3a;pointer-events:none;z-index:1}
-  .cyl{position:absolute;left:0;right:0;top:50%;height:28px;margin-top:-14px;transform-style:preserve-3d;transition:transform .22s cubic-bezier(.2,.7,.2,1)}
+  .cyl{position:absolute;left:0;right:0;top:50%;height:28px;margin-top:-14px;transform-style:preserve-3d;transition:transform .26s cubic-bezier(.3,1.35,.5,1)}
   .face{position:absolute;inset:0;display:grid;place-items:center;font:700 22px/1 var(--mono);color:#fff;backface-visibility:hidden;background:linear-gradient(#262626,#0e0e0e)}
   .drum:focus-visible{outline:2px solid var(--red);outline-offset:2px}
   .rotor select{width:100%;font:13px var(--mono);color:#ccc;background:#000;border:1px solid #333;padding:3px 2px;text-align:center}
@@ -260,7 +262,38 @@ function stepRotor(i, d) {
   const k = (A.indexOf(c.start[i]) + d + A.length) % A.length;
   c.start = c.start.slice(0, i) + A[k] + c.start.slice(i + 1);
   setDrums(c.start); recompute();
+  if (navigator.vibrate) navigator.vibrate(6);
 }
+
+// drag a drum like a thumbwheel; a flick keeps it spinning and it settles on a letter
+const drag = { el: null, i: 0, y0: 0, acc: 0, samples: [], moved: false, timer: 0 };
+function stopInertia() { clearTimeout(drag.timer); drag.timer = 0; }
+function spinDown(i, dir, interval) {
+  if (interval > 190) return;
+  drag.timer = setTimeout(() => { stepRotor(i, dir); spinDown(i, dir, interval * 1.28); }, interval);
+}
+$('#rotors').addEventListener('pointerdown', (e) => {
+  const d = e.target.closest('.drum'); if (!d) return;
+  stopInertia();
+  Object.assign(drag, { el: d, i: +d.dataset.i, y0: e.clientY, acc: 0, samples: [[e.clientY, performance.now()]], moved: false });
+  d.setPointerCapture(e.pointerId); d.classList.add('dragging');
+});
+$('#rotors').addEventListener('pointermove', (e) => {
+  if (!drag.el) return;
+  const dy = e.clientY - drag.y0; drag.y0 = e.clientY; drag.acc += dy;
+  drag.samples.push([e.clientY, performance.now()]); if (drag.samples.length > 6) drag.samples.shift();
+  while (Math.abs(drag.acc) >= FACE) { const dir = drag.acc > 0 ? -1 : 1; drag.acc -= Math.sign(drag.acc) * FACE; drag.moved = true; stepRotor(drag.i, dir); }
+});
+$('#rotors').addEventListener('pointerup', (e) => {
+  const d = drag.el; if (!d) return;
+  d.classList.remove('dragging'); drag.el = null;
+  if (!drag.moved) { const r = d.getBoundingClientRect(); stepRotor(drag.i, e.clientY < r.top + r.height / 2 ? 1 : -1); return; }
+  const [y1, t1] = drag.samples[0], [y2, t2] = drag.samples.at(-1);
+  const v = (y2 - y1) / Math.max(1, t2 - t1); // px per ms
+  if (Math.abs(v) < 0.35) return;
+  spinDown(drag.i, v > 0 ? -1 : 1, Math.max(28, 90 / Math.abs(v)));
+});
+$('#rotors').addEventListener('pointercancel', () => { drag.el?.classList.remove('dragging'); drag.el = null; });
 function readPanel() {
   const c = state.config;
   c.order = [...document.querySelectorAll('.order')].map((s) => s.value);
@@ -380,11 +413,9 @@ $('#swap').onclick = () => { $('#input').value = $('#output').textContent; recom
 $('#input').addEventListener('input', recompute);
 $('#rotors').addEventListener('input', (e) => { if (e.target.matches('.ring')) e.target.value = e.target.value.toUpperCase().slice(-1); recompute(); });
 $('#rotors').addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-d]'); if (b) return stepRotor(+b.dataset.i, +b.dataset.d);
-  const d = e.target.closest('.drum'); if (!d) return;
-  const r = d.getBoundingClientRect(); stepRotor(+d.dataset.i, e.clientY < r.top + r.height / 2 ? 1 : -1);
+  const b = e.target.closest('button[data-d]'); if (b) stepRotor(+b.dataset.i, +b.dataset.d);
 });
-$('#rotors').addEventListener('wheel', (e) => { const d = e.target.closest('.drum'); if (!d) return; e.preventDefault(); stepRotor(+d.dataset.i, e.deltaY < 0 ? 1 : -1); }, { passive: false });
+$('#rotors').addEventListener('wheel', (e) => { const d = e.target.closest('.drum'); if (!d) return; e.preventDefault(); stopInertia(); stepRotor(+d.dataset.i, e.deltaY < 0 ? 1 : -1); }, { passive: false });
 $('#rotors').addEventListener('keydown', (e) => {
   const d = e.target.closest('.drum'); if (!d) return;
   const A = state.config.alphabet, i = +d.dataset.i, L = e.key.toUpperCase();
