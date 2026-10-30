@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe Enigma</title>
+<meta name="description" content="A settable web Enigma that reads the DevFest Vibe Lounge machine from the API and decodes the live agenda feed.">
+<style>
+  :root{
+    --bg:#0a0a0a;--panel:#f2efe9;--ink:#111;--muted:#6b6b6b;--line:#2a2a2a;
+    --accent:#ff3b30;--lamp:#ffd166;--mono:"IBM Plex Mono","SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:#eee;font-family:var(--mono);font-size:14px;line-height:1.45}
+  a{color:inherit}
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:20px 24px 8px;flex-wrap:wrap}
+  h1{margin:0;font:800 clamp(28px,5vw,44px)/1 "Oswald","Impact","Arial Narrow",sans-serif;letter-spacing:.5px;text-transform:uppercase}
+  .status{display:flex;gap:14px;align-items:center;font-size:13px;color:#bbb;flex-wrap:wrap}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#555;margin-right:6px;vertical-align:middle}
+  .dot.ok{background:#2ecc71;box-shadow:0 0 8px #2ecc71}
+  .dot.bad{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .dot.live{background:var(--accent);animation:blink 1.2s infinite}
+  @keyframes blink{50%{opacity:.25}}
+  main{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:16px;padding:8px 24px 32px}
+  @media (max-width:900px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);color:var(--ink);padding:18px;border-radius:4px}
+  .card h2{margin:0 0 10px;font:800 22px/1 "Oswald","Impact","Arial Narrow",sans-serif;text-transform:uppercase}
+  .card.dark{background:#141414;color:#eee;border:1px solid var(--line)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:10px 0}
+  label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+  .dark label{color:#888}
+  select,input,textarea,button{font:inherit}
+  select,input[type=text]{padding:6px 8px;border:1px solid #bbb;border-radius:3px;background:#fff;color:var(--ink)}
+  .dark select,.dark input[type=text],.dark textarea{background:#000;color:#eee;border-color:#333}
+  input.win{width:3.2em;text-align:center;font-size:22px;font-weight:700;text-transform:uppercase;padding:4px}
+  .rotor{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .rotor .nudge{display:flex;gap:4px}
+  .nudge button{padding:0 8px;line-height:20px;border:1px solid #bbb;background:#fff;cursor:pointer;border-radius:3px}
+  textarea{width:100%;min-height:72px;padding:8px;border:1px solid #bbb;border-radius:3px;resize:vertical;text-transform:uppercase;letter-spacing:.04em}
+  .out{min-height:72px;padding:8px;border:1px dashed #555;border-radius:3px;white-space:pre-wrap;word-break:break-word;font-size:16px;letter-spacing:.04em;background:#000}
+  .lamps{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:10px 0}
+  .lamp{aspect-ratio:1;border-radius:50%;border:1px solid #333;display:grid;place-items:center;font-weight:700;color:#666;background:#0d0d0d;transition:all .08s}
+  .lamp.on{background:var(--lamp);color:#111;box-shadow:0 0 14px var(--lamp)}
+  .path{font-size:12px;color:#aaa;min-height:1.4em}
+  .path b{color:var(--lamp)}
+  button.primary{background:var(--ink);color:#fff;border:0;padding:8px 14px;border-radius:3px;cursor:pointer;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  button.ghost{background:transparent;color:#eee;border:1px solid #444;padding:6px 10px;border-radius:3px;cursor:pointer}
+  .feed{display:flex;flex-direction:column;gap:10px}
+  .tx{border:1px solid var(--line);border-left:3px solid #444;padding:10px 12px;border-radius:3px;background:#0f0f0f;animation:fade .4s}
+  .tx.fresh{border-left-color:var(--accent)}
+  @keyframes fade{from{opacity:0;transform:translateY(-4px)}}
+  .tx .meta{display:flex;gap:14px;font-size:11px;color:#888;margin-bottom:6px;flex-wrap:wrap}
+  .tx .meta b{color:#ddd}
+  .tx .plain{font-size:17px;color:#fff;letter-spacing:.03em;word-break:break-word}
+  .tx .cipher{font-size:11px;color:#666;margin-top:6px;word-break:break-word}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px}
+  .kv span:first-child{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+  code{background:#e4e0d8;padding:1px 4px;border-radius:2px;font-size:12px}
+  .dark code{background:#222}
+  .small{font-size:11px;color:#888}
+  .countbar{height:3px;background:#222;border-radius:2px;overflow:hidden;margin-top:6px}
+  .countbar i{display:block;height:100%;background:var(--accent);width:0%}
+  footer{padding:0 24px 24px;color:#666;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Vibe Enigma</h1>
+  <div class="status">
+    <span><i class="dot" id="dot-api"></i><span id="s-api">loading machine…</span></span>
+    <span><i class="dot" id="dot-test"></i><span id="s-test">self-test</span></span>
+    <span><i class="dot live"></i>On air <b id="clock">--:--:--</b></span>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Machine</h2>
+      <div class="kv" id="machine-info"></div>
+      <div class="row">
+        <div style="flex:1">
+          <label>Config source</label>
+          <input type="text" id="api-base" style="width:100%" value="https://devfest-vibe-lounge.web.app/api">
+        </div>
+        <button class="primary" id="reload">Reload</button>
+      </div>
+
+      <label>Rotor order (left → right) · start · ring</label>
+      <div class="row" id="rotors"></div>
+
+      <div class="row">
+        <div><label>Reflector</label><select id="reflector"></select></div>
+        <div style="flex:1"><label>Plugboard pairs</label><input type="text" id="plugboard" style="width:100%" placeholder="DE VF ST"></div>
+      </div>
+      <div class="row">
+        <button class="primary" id="reset">Reset to API</button>
+        <button class="primary" id="share">Copy share link</button>
+        <span class="small" id="share-msg"></span>
+      </div>
+    </div>
+
+    <div class="card dark" style="margin-top:16px">
+      <h2>Keyboard</h2>
+      <p class="small" style="margin:0 0 6px">Type to encode or decode. Rotors step live, letters outside the alphabet pass through.</p>
+      <textarea id="input" placeholder="Paste ciphertext or type plaintext…" spellcheck="false"></textarea>
+      <div class="lamps" id="lamps"></div>
+      <div class="path" id="path">—</div>
+      <label style="margin-top:8px">Output · rotors now at <b id="pos-now">—</b></label>
+      <div class="out" id="output"></div>
+      <div class="row">
+        <button class="ghost" id="copy-out">Copy output</button>
+        <button class="ghost" id="swap">Use output as input</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card dark">
+    <h2>Intercepted transmissions</h2>
+    <div class="row" style="justify-content:space-between;margin-top:0">
+      <span class="small" id="feed-status">waiting for feed…</span>
+      <label style="margin:0;display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px">
+        <input type="checkbox" id="auto" checked> auto-refresh
+      </label>
+    </div>
+    <div class="countbar"><i id="countbar"></i></div>
+    <div class="feed" id="feed" style="margin-top:12px"></div>
+  </section>
+</main>
+
+<footer>
+  Nothing hardcoded: rotors, reflector, rings, plugboard, alphabet and the test vector all come from <code>/api/enigma</code>. Reciprocal, N-rotor, double-stepping. Source on GitHub.
+</footer>
+
+<script type="module">
+import { createMachine, encode } from './enigma.js';
+
+const $ = (s) => document.querySelector(s);
+const state = { api: null, config: null, seen: new Set(), lastFetch: 0, interval: 15000 };
+
+// ---------- config loading ----------
+async function loadConfig() {
+  const base = $('#api-base').value.replace(/\/$/, '');
+  $('#dot-api').className = 'dot'; $('#s-api').textContent = 'loading machine…';
+  try {
+    const r = await fetch(`${base}/enigma`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    state.api = await r.json();
+    $('#dot-api').className = 'dot ok';
+    $('#s-api').textContent = `${state.api.machine || 'machine'} loaded`;
+  } catch (e) {
+    $('#dot-api').className = 'dot bad';
+    $('#s-api').textContent = `API failed: ${e.message}`;
+    return;
+  }
+  applyFromApi();
+  if (!applyHash()) {}
+  renderMachine();
+  runSelfTest();
+  recompute();
+  await loadFeed(true);
+}
+
+function applyFromApi() {
+  const a = state.api;
+  state.config = {
+    alphabet: a.alphabet || 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    rotorBank: a.rotors.map((r) => ({ ...r })),              // every rotor the API knows
+    reflectorBank: [a.reflector, ...(a.reflectors || [])].filter(Boolean),
+    order: a.rotors.map((r) => r.name),                     // chosen rotors, left→right
+    rings: (a.rings || '').toUpperCase(),
+    start: (a.alphabet || 'A')[0].repeat(a.rotors.length),
+    reflector: a.reflector.name,
+    plugboard: (a.plugboard || []).join(' '),
+  };
+}
+
+function machineConfig(start) {
+  const c = state.config;
+  const bank = Object.fromEntries(c.rotorBank.map((r) => [r.name, r]));
+  return {
+    alphabet: c.alphabet,
+    rotors: c.order.map((n) => bank[n]),
+    reflector: c.reflectorBank.find((r) => r.name === c.reflector) || c.reflectorBank[0],
+    rings: c.rings,
+    plugboard: c.plugboard.toUpperCase().split(/[\s,]+/).filter((p) => p.length === 2),
+    start,
+  };
+}
+
+// ---------- machine panel ----------
+function renderMachine() {
+  const a = state.api, c = state.config;
+  $('#machine-info').innerHTML = [
+    ['Model', a.machine || '—'],
+    ['Rotors', c.rotorBank.map((r) => `${r.name} (notch ${r.notch})`).join(', ')],
+    ['Reflector', c.reflectorBank.map((r) => r.name).join(', ')],
+    ['Test vector', a.testVector ? `${a.testVector.start}: ${a.testVector.plaintext} → ${a.testVector.ciphertext}` : '—'],
+  ].map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
+
+  const host = $('#rotors'); host.innerHTML = '';
+  c.order.forEach((name, i) => {
+    const d = document.createElement('div'); d.className = 'rotor';
+    d.innerHTML = `
+      <select data-i="${i}" class="order">${c.rotorBank.map((r) => `<option ${r.name === name ? 'selected' : ''}>${r.name}</option>`).join('')}</select>
+      <input class="win start" data-i="${i}" maxlength="1" value="${c.start[i] || c.alphabet[0]}" title="start position">
+      <div class="nudge"><button data-i="${i}" data-d="1">▲</button><button data-i="${i}" data-d="-1">▼</button></div>
+      <input class="win ring" data-i="${i}" maxlength="1" value="${c.rings[i] || c.alphabet[0]}" title="ring setting" style="font-size:14px;width:2.6em">`;
+    host.appendChild(d);
+  });
+  $('#reflector').innerHTML = c.reflectorBank.map((r) => `<option ${r.name === c.reflector ? 'selected' : ''}>${r.name}</option>`).join('');
+  $('#plugboard').value = c.plugboard;
+
+  const lamps = $('#lamps'); lamps.innerHTML = '';
+  c.alphabet.split('').forEach((L) => { const s = document.createElement('div'); s.className = 'lamp'; s.id = `lamp-${L}`; s.textContent = L; lamps.appendChild(s); });
+}
+
+function readPanel() {
+  const c = state.config;
+  c.order = [...document.querySelectorAll('.order')].map((s) => s.value);
+  c.start = [...document.querySelectorAll('.start')].map((i) => (i.value.toUpperCase() || c.alphabet[0])[0]).join('');
+  c.rings = [...document.querySelectorAll('.ring')].map((i) => (i.value.toUpperCase() || c.alphabet[0])[0]).join('');
+  c.reflector = $('#reflector').value;
+  c.plugboard = $('#plugboard').value;
+}
+
+// ---------- self test ----------
+function runSelfTest() {
+  const tv = state.api.testVector;
+  if (!tv) { $('#s-test').textContent = 'no test vector'; return; }
+  const got = encode(machineConfig(tv.start), tv.start, tv.plaintext);
+  const back = encode(machineConfig(tv.start), tv.start, tv.ciphertext);
+  const ok = got === tv.ciphertext && back === tv.plaintext;
+  $('#dot-test').className = `dot ${ok ? 'ok' : 'bad'}`;
+  $('#s-test').textContent = ok ? 'self-test pass (both directions)' : `self-test FAIL: got ${got}`;
+}
+
+// ---------- keyboard / lamps ----------
+function recompute() {
+  readPanel();
+  const text = $('#input').value;
+  const m = createMachine(machineConfig(state.config.start), state.config.start);
+  let out = '', last = null;
+  for (const ch of text) { const r = m.encodeChar(ch); out += r.out; if (r.path) last = { ch: ch.toUpperCase(), r }; }
+  $('#output').textContent = out;
+  $('#pos-now').textContent = m.positions();
+  document.querySelectorAll('.lamp.on').forEach((l) => l.classList.remove('on'));
+  if (last) {
+    $(`#lamp-${last.r.out}`)?.classList.add('on');
+    const A = m.alphabet, p = last.r.path.map((i) => A[i]);
+    $('#path').innerHTML = `<b>${p[0]}</b> → plug ${p[1]} → rotors ${p.slice(2, 2 + state.config.order.length).join(' ')} → refl ${p[2 + state.config.order.length]} → back ${p.slice(3 + state.config.order.length, -1).join(' ')} → plug <b>${p.at(-1)}</b>`;
+  } else $('#path').textContent = '—';
+  writeHash();
+}
+
+// ---------- feed ----------
+async function loadFeed(force) {
+  const base = $('#api-base').value.replace(/\/$/, '');
+  try {
+    const r = await fetch(`${base}/transmissions`, { cache: 'no-store' });
+    const { transmissions = [] } = await r.json();
+    state.lastFetch = Date.now();
+    renderFeed(transmissions);
+    $('#feed-status').textContent = `${transmissions.length} transmissions · updated ${new Date().toLocaleTimeString()}`;
+  } catch (e) {
+    $('#feed-status').textContent = `feed error: ${e.message}`;
+  }
+}
+
+function renderFeed(list) {
+  const host = $('#feed');
+  const frag = document.createDocumentFragment();
+  for (const t of list) {
+    const plain = encode(machineConfig(t.start), t.start, t.ciphertext);
+    const el = document.createElement('div');
+    el.className = `tx ${state.seen.has(t.number) ? '' : 'fresh'}`;
+    el.innerHTML = `<div class="meta"><span>Nº <b>${t.number}</b></span><span>rotor start <b>${t.start}</b></span><span>${t.sentAt ? new Date(t.sentAt).toLocaleTimeString() : ''}</span>
+      <button class="ghost" style="padding:0 6px;font-size:11px" data-start="${t.start}" data-text="${encodeURIComponent(t.ciphertext)}">open in machine</button></div>
+      <div class="plain"></div><div class="cipher"></div>`;
+    el.querySelector('.plain').textContent = plain;
+    el.querySelector('.cipher').textContent = t.ciphertext;
+    frag.appendChild(el);
+    state.seen.add(t.number);
+  }
+  host.replaceChildren(frag);
+}
+
+$('#feed').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-start]'); if (!b) return;
+  const s = b.dataset.start;
+  document.querySelectorAll('.start').forEach((i, k) => (i.value = s[k] || ''));
+  $('#input').value = decodeURIComponent(b.dataset.text);
+  recompute(); window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// ---------- hash / share ----------
+function writeHash() {
+  const c = state.config;
+  const h = new URLSearchParams({ r: c.order.join(','), s: c.start, g: c.rings, u: c.reflector, p: c.plugboard.trim() });
+  history.replaceState(null, '', `#${h}`);
+}
+function applyHash() {
+  if (!location.hash.length) return false;
+  const h = new URLSearchParams(location.hash.slice(1)), c = state.config;
+  if (h.get('r')) c.order = h.get('r').split(',').filter((n) => c.rotorBank.some((r) => r.name === n));
+  if (h.get('s')) c.start = h.get('s').toUpperCase();
+  if (h.get('g')) c.rings = h.get('g').toUpperCase();
+  if (h.get('u')) c.reflector = h.get('u');
+  if (h.has('p')) c.plugboard = h.get('p');
+  return true;
+}
+
+// ---------- wiring ----------
+$('#reload').onclick = loadConfig;
+$('#reset').onclick = () => { applyFromApi(); renderMachine(); recompute(); };
+$('#share').onclick = async () => { await navigator.clipboard.writeText(location.href); $('#share-msg').textContent = 'copied'; setTimeout(() => ($('#share-msg').textContent = ''), 1500); };
+$('#copy-out').onclick = () => navigator.clipboard.writeText($('#output').textContent);
+$('#swap').onclick = () => { $('#input').value = $('#output').textContent; recompute(); };
+$('#input').addEventListener('input', recompute);
+$('#rotors').addEventListener('input', (e) => { if (e.target.classList.contains('win')) e.target.value = e.target.value.toUpperCase().slice(-1); recompute(); });
+$('#rotors').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-d]'); if (!b) return;
+  const A = state.config.alphabet, inp = document.querySelector(`.start[data-i="${b.dataset.i}"]`);
+  inp.value = A[(A.indexOf(inp.value.toUpperCase()) + +b.dataset.d + A.length) % A.length]; recompute();
+});
+$('#reflector').onchange = recompute; $('#plugboard').oninput = recompute;
+
+setInterval(() => {
+  $('#clock').textContent = new Date().toLocaleTimeString();
+  const pct = Math.min(100, (Date.now() - state.lastFetch) / state.interval * 100);
+  $('#countbar').style.width = `${pct}%`;
+  if ($('#auto').checked && state.api && Date.now() - state.lastFetch >= state.interval) loadFeed();
+}, 250);
+
+loadConfig();
+</script>
+</body>
+</html>
