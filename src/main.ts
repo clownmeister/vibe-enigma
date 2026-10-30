@@ -334,8 +334,8 @@ function renderSheet(direction = 0): void {
   $.tStamp.textContent = t.fresh && state.cursor === 0 ? 'Just in' : 'Intercepted';
   $.tPlain.textContent = t.plain;
   $.tCipher.textContent = t.ciphertext;
-  $.prev.disabled = state.cursor >= state.feed.length - 1;
-  $.next.disabled = state.cursor <= 0;
+  $.prev.disabled = state.feed.length < 2;
+  $.next.disabled = state.feed.length < 2;
 }
 
 function renderAll(): void {
@@ -371,10 +371,11 @@ function renderAll(): void {
   );
 }
 
+// Paging wraps: past the oldest comes the newest again, and the other way round.
 function moveCursor(delta: number): void {
-  const next = Math.max(0, Math.min(state.feed.length - 1, state.cursor + delta));
-  if (next === state.cursor) return;
-  state.cursor = next;
+  const n = state.feed.length;
+  if (n < 2) return;
+  state.cursor = (((state.cursor + delta) % n) + n) % n;
   state.pinned = state.cursor > 0;
   renderSheet(delta > 0 ? -1 : 1);
 }
