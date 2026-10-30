@@ -264,6 +264,7 @@ function drawInside(m: Machine): void {
     snapshot: m.wiring(),
     path: state.lastPath,
     width: $.wiring.clientWidth - 8,
+    still: state.show.timer !== 0,
   });
 }
 

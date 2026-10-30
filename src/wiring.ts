@@ -11,13 +11,16 @@ export interface WiringOptions {
   /** Stage indices of the last letter, as encodeChar reports them; empty when idle. */
   path: number[];
   width: number;
+  /** Skip the draw-on animation (play mode redraws every key). */
+  still: boolean;
 }
 
 const ROW = 13;
 const PAD_TOP = 22;
 const LABEL_W = 22;
 
-export function renderWiring({ alphabet, order, snapshot, path, width }: WiringOptions): string {
+export function renderWiring({ alphabet, order, snapshot, path, width, still }: WiringOptions): string {
+  const liveCls = still ? 'live still' : 'live';
   const n = alphabet.length;
   const names = [...order].reverse(); // right to left, matching snapshot.rotors
   const columns = ['plug', ...names, 'ukw'];
@@ -63,12 +66,14 @@ export function renderWiring({ alphabet, order, snapshot, path, width }: WiringO
     const R = snapshot.rotors.length;
     // forward: in->plug (col 0->1), plug->rotor1 (1->2) ... ->ukw
     for (let k = 0; k <= R; k++)
-      live.push(line(x(k), y(path[k] ?? 0), x(k + 1), y(path[k + 1] ?? 0), 'live fwd'));
-    live.push(arc(ukwX, y(path[R + 1] ?? 0), y(path[R + 2] ?? 0), colW * 0.8, 'live fwd'));
+      live.push(line(x(k), y(path[k] ?? 0), x(k + 1), y(path[k + 1] ?? 0), `${liveCls} fwd`));
+    live.push(arc(ukwX, y(path[R + 1] ?? 0), y(path[R + 2] ?? 0), colW * 0.8, `${liveCls} fwd`));
     // back: ukw->rotorL ... ->plug->out
     for (let k = 0; k <= R; k++) {
       const col = R + 1 - k;
-      live.push(line(x(col), y(path[R + 2 + k] ?? 0), x(col - 1), y(path[R + 3 + k] ?? 0), 'live back'));
+      live.push(
+        line(x(col), y(path[R + 2 + k] ?? 0), x(col - 1), y(path[R + 3 + k] ?? 0), `${liveCls} back`),
+      );
     }
   }
 
