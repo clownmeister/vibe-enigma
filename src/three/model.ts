@@ -137,7 +137,7 @@ export function makeRotor(alphabet: string, restX: number, explodeRank: number):
   // the bakelite core; its faces carry the contacts, so they get a face material that catches light
   const face = new THREE.MeshStandardMaterial({ color: 0x2a241e, metalness: 0.35, roughness: 0.5 });
   const body = shadowed(
-    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 0.9, ROTOR_R * 0.9, ROTOR_T, 64), [
+    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 0.88, ROTOR_R * 0.88, ROTOR_T - 0.01, 64), [
       bakelite,
       face,
       face,
@@ -166,7 +166,7 @@ export function makeRotor(alphabet: string, restX: number, explodeRank: number):
   for (const side of [-1, 1] as const) {
     const cap = new THREE.Mesh(new THREE.RingGeometry(ROTOR_R * 0.9, ROTOR_R, 64), bakeliteBoth);
     cap.rotation.y = (side * Math.PI) / 2;
-    cap.position.x = tyreX + (side * tyreW) / 2;
+    cap.position.x = tyreX + (side * tyreW) / 2 + side * 0.004; // a hair proud, no z-fight
     drum.add(cap);
   }
 
@@ -176,7 +176,7 @@ export function makeRotor(alphabet: string, restX: number, explodeRank: number):
     new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 1.02, ROTOR_R * 1.02, wheelW, 64), brass),
   );
   wheel.rotation.z = Math.PI / 2;
-  wheel.position.x = ROTOR_T / 2 - wheelW / 2;
+  wheel.position.x = ROTOR_T / 2 - wheelW / 2 + 0.006; // clears the body end face
   drum.add(wheel);
   const tooth = new THREE.BoxGeometry(wheelW, 0.05, 0.09);
   for (let i = 0; i < N; i++) {
