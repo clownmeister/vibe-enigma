@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>Vibe Enigma</title>
+    <meta
+      name="description"
+      content="A settable web Enigma I that reads the DevFest Vibe Lounge machine from the API and decodes the live agenda feed."
+    />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Special+Elite&family=JetBrains+Mono:wght@400;700&display=swap"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/v2/landing.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>
+          Vibe Enigma
+          <small
+            >A working Enigma I, tuned to the DevFest agenda feed. Spin the drums, type, read the
+            lamps.</small
+          >
+        </h1>
+        <div class="status">
+          <span id="s-api">LOADING MACHINE</span>
+          <span id="s-test"></span>
+          <span>On air <b id="clock">--:--:--</b></span>
+        </div>
+      </header>
+
+      <section class="sheet" aria-live="polite">
+        <div class="form"><span>Form 1A · W/T intercept</span><span>Vibe Lounge · Prague</span></div>
+        <div class="meta">
+          <span class="num" id="t-num">Nº ····</span>
+          <span>rotor start <b id="t-start">···</b></span>
+          <span id="t-time"></span>
+        </div>
+        <span class="stamp" id="t-stamp">Intercepted</span>
+        <div class="plain" id="t-plain">TUNING IN</div>
+        <div class="cipher" id="t-cipher"></div>
+        <div class="nav">
+          <button id="prev" aria-label="older">← older</button>
+          <button id="next" aria-label="newer">newer →</button>
+          <span class="spacer"></span>
+          <span id="feed-status" role="status"></span>
+          <button id="all">all</button>
+          <button id="open" title="Load this transmission into the machine">
+            open in machine <span class="dn">↓</span><span class="up">↑</span>
+          </button>
+        </div>
+        <div class="all" id="all-list"></div>
+        <div class="auto" aria-hidden="true"><i id="auto-bar"></i></div>
+      </section>
+
+      <!-- the machine itself, live: drums turn and the lamp lights as you type below -->
+      <section class="stage" id="stage" aria-label="The Enigma I in three dimensions">
+        <canvas id="stage-canvas"></canvas>
+        <button class="stage-open" id="stage-open" aria-expanded="false">examine</button>
+        <div class="stage-tools" id="stage-tools" hidden>
+          <label for="explode">Pull apart <output id="explode-out">0</output></label>
+          <input type="range" id="explode" min="0" max="100" value="0" />
+          <button id="stage-close">back to the desk</button>
+        </div>
+        <p class="stage-fallback" id="stage-fallback" hidden>
+          The 3D view needs WebGL. The machine below still works.
+        </p>
+      </section>
+
+      <section class="machine">
+        <div>
+          <h2>
+            <span id="machine-name">Machine</span>
+            <span class="aside"><button id="reset">reset</button><button id="share">share</button></span>
+          </h2>
+          <div class="lbl">Rotors, left to right</div>
+          <div class="rotors" id="rotors"></div>
+          <div class="wiring">
+            <span
+              ><label class="lbl" for="reflector">Reflector</label
+              ><select id="reflector"></select
+            ></span>
+            <span>
+              <label class="lbl" for="plugboard">Plugboard</label>
+              <input
+                type="text"
+                id="plugboard"
+                placeholder="AB CD"
+                autocapitalize="characters"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </span>
+          </div>
+        </div>
+        <div>
+          <h2>
+            Lampboard
+            <span class="aside">
+              <button id="play" title="Type the message letter by letter">play ▸</button>
+              <button id="sound" aria-pressed="true">sound on</button>
+              <button id="swap">swap ⇄</button>
+            </span>
+          </h2>
+          <textarea
+            id="input"
+            placeholder="TYPE A MESSAGE OR PASTE CIPHERTEXT"
+            spellcheck="false"
+            autocapitalize="characters"
+            autocomplete="off"
+            aria-label="message"
+          ></textarea>
+          <div class="lamps" id="lamps" aria-hidden="true"></div>
+          <div class="path" id="path"></div>
+          <div class="lbl" style="margin-top: 12px">
+            Output · rotors at <b id="pos-now" class="plate">—</b>
+          </div>
+          <div class="out" id="output" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <footer>
+        <span class="about">
+          A faithful Enigma I: rotor wiring, ring settings, the double step and the reflector all behave like
+          the 1930s machine, and every setting comes from the lounge API.
+          <a href="https://www.cryptomuseum.com/crypto/enigma/working.htm">How the real one worked</a> ·
+          <a href="https://en.wikipedia.org/wiki/Enigma_rotor_details">rotor wiring tables</a>
+        </span>
+        <span class="sig">Lucián Blažek<small>DevFest Prague · 30 October 2026</small></span>
+        <span class="links">
+          <a href="https://github.com/clownmeister/vibe-enigma">GitHub</a>
+          <span>
+            <label for="api-base">source</label>
+            <input
+              type="text"
+              id="api-base"
+              value="https://devfest-vibe-lounge.web.app/api"
+              autocapitalize="off"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </span>
+        </span>
+      </footer>
+    </div>
+    <script type="module" src="/src/v2/main.ts"></script>
+  </body>
+</html>
