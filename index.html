@@ -263,14 +263,34 @@ function stepRotor(i, d) {
   c.start = c.start.slice(0, i) + A[k] + c.start.slice(i + 1);
   setDrums(c.start); recompute();
   if (navigator.vibrate) navigator.vibrate(6);
+  click();
+}
+
+// a short mechanical tick: filtered noise burst plus a tiny thump
+let ac;
+function click() {
+  try {
+    ac ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === 'suspended') ac.resume();
+    const t = ac.currentTime;
+    const buf = ac.createBuffer(1, ac.sampleRate * 0.02, ac.sampleRate);
+    const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
+    const n = ac.createBufferSource(); n.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2600; f.Q.value = 1.2;
+    const g = ac.createGain(); g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+    n.connect(f).connect(g).connect(ac.destination); n.start(t);
+    const o = ac.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.03);
+    const g2 = ac.createGain(); g2.gain.setValueAtTime(0.12, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    o.connect(g2).connect(ac.destination); o.start(t); o.stop(t + 0.05);
+  } catch {}
 }
 
 // drag a drum like a thumbwheel; a flick keeps it spinning and it settles on a letter
 const drag = { el: null, i: 0, y0: 0, acc: 0, samples: [], moved: false, timer: 0 };
 function stopInertia() { clearTimeout(drag.timer); drag.timer = 0; }
 function spinDown(i, dir, interval) {
-  if (interval > 190) return;
-  drag.timer = setTimeout(() => { stepRotor(i, dir); spinDown(i, dir, interval * 1.28); }, interval);
+  if (interval > 260) return;
+  drag.timer = setTimeout(() => { stepRotor(i, dir); spinDown(i, dir, interval * 1.11 + 2); }, interval);
 }
 $('#rotors').addEventListener('pointerdown', (e) => {
   const d = e.target.closest('.drum'); if (!d) return;
@@ -282,7 +302,7 @@ $('#rotors').addEventListener('pointermove', (e) => {
   if (!drag.el) return;
   const dy = e.clientY - drag.y0; drag.y0 = e.clientY; drag.acc += dy;
   drag.samples.push([e.clientY, performance.now()]); if (drag.samples.length > 6) drag.samples.shift();
-  while (Math.abs(drag.acc) >= FACE) { const dir = drag.acc > 0 ? -1 : 1; drag.acc -= Math.sign(drag.acc) * FACE; drag.moved = true; stepRotor(drag.i, dir); }
+  while (Math.abs(drag.acc) >= FACE) { const dir = drag.acc > 0 ? 1 : -1; drag.acc -= Math.sign(drag.acc) * FACE; drag.moved = true; stepRotor(drag.i, dir); }
 });
 $('#rotors').addEventListener('pointerup', (e) => {
   const d = drag.el; if (!d) return;
@@ -290,8 +310,8 @@ $('#rotors').addEventListener('pointerup', (e) => {
   if (!drag.moved) { const r = d.getBoundingClientRect(); stepRotor(drag.i, e.clientY < r.top + r.height / 2 ? 1 : -1); return; }
   const [y1, t1] = drag.samples[0], [y2, t2] = drag.samples.at(-1);
   const v = (y2 - y1) / Math.max(1, t2 - t1); // px per ms
-  if (Math.abs(v) < 0.35) return;
-  spinDown(drag.i, v > 0 ? -1 : 1, Math.max(28, 90 / Math.abs(v)));
+  if (Math.abs(v) < 0.3) return;
+  spinDown(drag.i, v > 0 ? 1 : -1, Math.max(24, 70 / Math.abs(v)));
 });
 $('#rotors').addEventListener('pointercancel', () => { drag.el?.classList.remove('dragging'); drag.el = null; });
 function readPanel() {
