@@ -652,7 +652,7 @@ textarea:focus {
 .inside.open {
   grid-template-rows: 1fr;
 }
-.inside > * {
+.inside-body {
   overflow: hidden;
   min-height: 0;
 }
