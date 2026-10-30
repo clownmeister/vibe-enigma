@@ -46,6 +46,8 @@ export const bakelite = new THREE.MeshStandardMaterial({
   bumpMap: crinkle,
   bumpScale: 0.004,
 });
+const bakeliteBoth = bakelite.clone();
+bakeliteBoth.side = THREE.DoubleSide;
 export const steel = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 0.9, roughness: 0.3 });
 const pinMat = new THREE.MeshStandardMaterial({ color: 0xd9b56a, metalness: 0.95, roughness: 0.2 });
 const wireMat = new THREE.LineBasicMaterial({ color: 0x3a3028, transparent: true, opacity: 0.55 });
@@ -132,26 +134,41 @@ export function makeRotor(alphabet: string, restX: number, explodeRank: number):
   const drum = new THREE.Group(); // the part that turns
   group.add(drum);
 
-  // the bakelite core
+  // the bakelite core; its faces carry the contacts, so they get a face material that catches light
+  const face = new THREE.MeshStandardMaterial({ color: 0x2a241e, metalness: 0.35, roughness: 0.5 });
   const body = shadowed(
-    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 0.9, ROTOR_R * 0.9, ROTOR_T, 64), bakelite),
+    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 0.9, ROTOR_R * 0.9, ROTOR_T, 64), [
+      bakelite,
+      face,
+      face,
+    ]),
   );
   body.rotation.z = Math.PI / 2;
   drum.add(body);
 
-  // the alphabet tyre: a solid ring on the left two thirds of the rim, letters engraved around it
+  // the alphabet tyre: an open band around the left two thirds of the rim, letters engraved around it
   const tyreW = ROTOR_T * 0.6;
+  const tyreX = -ROTOR_T / 2 + tyreW / 2 + 0.02;
   const tyre = shadowed(
-    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R, ROTOR_R, tyreW, 64), [
-      new THREE.MeshStandardMaterial({ map: letterRim(alphabet), metalness: 0.1, roughness: 0.7 }),
-      bakelite,
-      bakelite,
-    ]),
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(ROTOR_R, ROTOR_R, tyreW, 64, 1, true),
+      new THREE.MeshStandardMaterial({
+        map: letterRim(alphabet),
+        metalness: 0.1,
+        roughness: 0.7,
+        side: THREE.DoubleSide,
+      }),
+    ),
   );
-  tyre.rotation.z = Math.PI / 2;
-  tyre.rotation.y = Math.PI / 2;
-  tyre.position.x = -ROTOR_T / 2 + tyreW / 2 + 0.02;
+  tyre.rotation.z = Math.PI / 2; // axis along the axle; the texture wraps the rim
+  tyre.position.x = tyreX;
   drum.add(tyre);
+  for (const side of [-1, 1] as const) {
+    const cap = new THREE.Mesh(new THREE.RingGeometry(ROTOR_R * 0.9, ROTOR_R, 64), bakeliteBoth);
+    cap.rotation.y = (side * Math.PI) / 2;
+    cap.position.x = tyreX + (side * tyreW) / 2;
+    drum.add(cap);
+  }
 
   // the finger wheel: a serrated brass ring on the right edge, a touch larger than the tyre
   const wheelW = ROTOR_T * 0.22;
@@ -412,7 +429,7 @@ export function makeCase(): { base: THREE.Group; lid: THREE.Group } {
   }
   const lid = new THREE.Group();
   const top = shadowed(new THREE.Mesh(new THREE.BoxGeometry(CASE.w, 0.12, CASE.d), wood));
-  top.position.set(0, 0.9, CASE.d / 2);
+  top.position.set(0, 1.3, CASE.d / 2);
   lid.add(top);
   for (const [x, z, w, d] of [
     [-2.55, CASE.d / 2, 0.1, CASE.d],
@@ -420,8 +437,8 @@ export function makeCase(): { base: THREE.Group; lid: THREE.Group } {
     [0, 0.05, CASE.w, 0.1],
     [0, CASE.d - 0.05, CASE.w, 0.1],
   ] as const) {
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 0.9, d), wood);
-    wall.position.set(x, 0.45, z);
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 1.3, d), wood);
+    wall.position.set(x, 0.65, z);
     lid.add(wall);
   }
   // two brass hinge barrels at the back, two latches at the front, a lip the lid closes over
@@ -436,7 +453,7 @@ export function makeCase(): { base: THREE.Group; lid: THREE.Group } {
     latch.position.set(lx, CASE.rimY - 0.16, CASE.d / 2 + 0.07);
     base.add(latch);
     const keeper = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.04), brass);
-    keeper.position.set(lx, 0.1, CASE.d - 0.05 + 0.07);
+    keeper.position.set(lx, 0.12, CASE.d - 0.05 + 0.07);
     lid.add(keeper);
   }
   // a thin lip frame around the opening for the lid to close over
