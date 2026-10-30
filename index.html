@@ -138,7 +138,8 @@
       </label>
     </div>
     <div class="countbar"><i id="countbar"></i></div>
-    <div class="feed" id="feed" style="margin-top:12px"></div>
+    <div class="feed" id="feed"></div>
+    <button class="ghost" id="more" hidden style="width:100%;margin-top:10px"></button>
   </section>
 </main>
 
@@ -150,7 +151,7 @@
 import { createMachine, encode } from './enigma.js';
 
 const $ = (s) => document.querySelector(s);
-const state = { api: null, config: null, seen: new Set(), lastFetch: 0, interval: 15000 };
+const state = { api: null, config: null, seen: new Set(), lastFetch: 0, interval: 15000, feed: null, showAll: false };
 
 // ---------- config loading ----------
 async function loadConfig() {
@@ -281,10 +282,17 @@ async function loadFeed(force) {
   }
 }
 
+const PAGE = 3;
 function renderFeed(list) {
+  state.feed = list;
   const host = $('#feed');
   const frag = document.createDocumentFragment();
-  for (const t of list) {
+  const narrow = matchMedia('(max-width: 900px)').matches;
+  const shown = narrow && !state.showAll ? list.slice(0, PAGE) : list;
+  const more = $('#more');
+  more.hidden = !(narrow && list.length > PAGE);
+  more.textContent = state.showAll ? 'Show fewer' : `Show ${list.length - PAGE} older`;
+  for (const t of shown) {
     const plain = encode(machineConfig(t.start), t.start, t.ciphertext);
     const el = document.createElement('div');
     el.className = `tx ${state.seen.has(t.number) ? '' : 'fresh'}`;
@@ -299,6 +307,8 @@ function renderFeed(list) {
   host.replaceChildren(frag);
 }
 
+$('#more').onclick = () => { state.showAll = !state.showAll; renderFeed(state.feed); };
+matchMedia('(max-width: 900px)').addEventListener('change', () => state.feed && renderFeed(state.feed));
 $('#feed').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-start]'); if (!b) return;
   const s = b.dataset.start;
