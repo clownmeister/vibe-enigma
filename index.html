@@ -148,7 +148,7 @@
     </div>
   </div>
   <div>
-    <h2>Keyboard<span class="aside"><button id="swap">swap ⇄</button></span></h2>
+    <h2>Keyboard<span class="aside"><button id="sound" aria-pressed="true">sound on</button><button id="swap">swap ⇄</button></span></h2>
     <textarea id="input" placeholder="Type plaintext or paste ciphertext" spellcheck="false" autocapitalize="characters" autocomplete="off" aria-label="message"></textarea>
     <div class="lamps" id="lamps" aria-hidden="true"></div>
     <div class="path" id="path">&nbsp;</div>
@@ -267,15 +267,41 @@ function stepRotor(i, d) {
 }
 
 // a short mechanical tick: filtered noise burst plus a tiny thump
-let ac;
+let ac, muted = localStorage.getItem('enigma-mute') === '1';
+function audio() {
+  if (muted) return null;
+  ac ??= new (window.AudioContext || window.webkitAudioContext)();
+  if (ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function noise(ac, secs, curve = 3) {
+  const buf = ac.createBuffer(1, Math.ceil(ac.sampleRate * secs), ac.sampleRate);
+  const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** curve;
+  const n = ac.createBufferSource(); n.buffer = buf; return n;
+}
+// typewriter: a hard strike with a short metallic ring; space bar is a duller thud
+function clack(space) {
+  try {
+    const ac = audio(); if (!ac) return;
+    const t = ac.currentTime, n = noise(ac, space ? 0.05 : 0.035, 2);
+    const f = ac.createBiquadFilter(); f.type = space ? 'lowpass' : 'highpass'; f.frequency.value = space ? 900 : 1800;
+    const g = ac.createGain(); g.gain.setValueAtTime(space ? 0.5 : 0.7, t); g.gain.exponentialRampToValueAtTime(0.001, t + (space ? 0.07 : 0.05));
+    n.connect(f).connect(g).connect(ac.destination); n.start(t);
+    if (!space) {
+      const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(3200 + Math.random() * 600, t);
+      const g2 = ac.createGain(); g2.gain.setValueAtTime(0.06, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      o.connect(g2).connect(ac.destination); o.start(t); o.stop(t + 0.1);
+    }
+    const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.setValueAtTime(space ? 110 : 150, t); o2.frequency.exponentialRampToValueAtTime(50, t + 0.04);
+    const g3 = ac.createGain(); g3.gain.setValueAtTime(0.25, t); g3.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    o2.connect(g3).connect(ac.destination); o2.start(t); o2.stop(t + 0.07);
+  } catch {}
+}
 function click() {
   try {
-    ac ??= new (window.AudioContext || window.webkitAudioContext)();
+    const ac = audio(); if (!ac) return;
     if (ac.state === 'suspended') ac.resume();
-    const t = ac.currentTime;
-    const buf = ac.createBuffer(1, ac.sampleRate * 0.02, ac.sampleRate);
-    const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
-    const n = ac.createBufferSource(); n.buffer = buf;
+    const t = ac.currentTime, n = noise(ac, 0.02);
     const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2600; f.Q.value = 1.2;
     const g = ac.createGain(); g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
     n.connect(f).connect(g).connect(ac.destination); n.start(t);
@@ -430,7 +456,14 @@ $('#api-base').addEventListener('change', loadConfig);
 $('#reset').onclick = () => { applyFromApi(); renderMachine(); recompute(); };
 $('#share').onclick = async () => { await navigator.clipboard.writeText(location.href); const b = $('#share'); b.textContent = 'copied'; setTimeout(() => (b.textContent = 'share'), 1500); };
 $('#swap').onclick = () => { $('#input').value = $('#output').textContent; recompute(); };
-$('#input').addEventListener('input', recompute);
+let lastLen = 0;
+$('#input').addEventListener('input', (e) => {
+  const v = e.target.value;
+  if (v.length > lastLen && e.inputType !== 'insertFromPaste') { const ch = v[v.length - 1]; clack(ch === ' '); }
+  lastLen = v.length; recompute();
+});
+$('#sound').onclick = () => { muted = !muted; localStorage.setItem('enigma-mute', muted ? '1' : '0'); const b = $('#sound'); b.textContent = muted ? 'sound off' : 'sound on'; b.setAttribute('aria-pressed', String(!muted)); };
+if (muted) { $('#sound').textContent = 'sound off'; $('#sound').setAttribute('aria-pressed', 'false'); }
 $('#rotors').addEventListener('input', (e) => { if (e.target.matches('.ring')) e.target.value = e.target.value.toUpperCase().slice(-1); recompute(); });
 $('#rotors').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-d]'); if (b) stepRotor(+b.dataset.i, +b.dataset.d);
