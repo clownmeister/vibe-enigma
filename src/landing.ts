@@ -1,10 +1,10 @@
 // The landing with the live 3D strip. The page logic is the same app; the
 // strip mirrors its state and grows into the full stage on request.
-import { startApp } from '../app';
-import type { AppState } from '../app';
-import { DEFAULT_API, fetchMachine } from '../api';
-import type { EnigmaScene } from '../three/scene';
-import { LID_PART } from '../three/scene';
+import { startApp } from './app';
+import type { AppState } from './app';
+import { DEFAULT_API, fetchMachine } from './api';
+import type { EnigmaScene } from './three/scene';
+import { LID_PART } from './three/scene';
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller names the element type
 function el<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -45,7 +45,7 @@ async function mountScene(): Promise<void> {
     return;
   }
   const [{ createEnigmaScene }, desc] = await Promise.all([
-    import('../three/scene'),
+    import('./three/scene'),
     fetchMachine(ui.apiBase.value.replace(/\/$/, '') || DEFAULT_API),
   ]);
   view = createEnigmaScene(ui.canvas, desc);

@@ -14,8 +14,10 @@ Live: https://clownmeister.github.io/vibe-enigma/
 | `src/path.ts`          | The signal-path SVG                                                                  |
 | `src/wiring.ts`        | The look-inside wiring diagram                                                       |
 | `src/audio.ts`         | Synthesised clicks, clacks, teleprinter burst, mute                                  |
-| `src/main.ts`          | Page state and wiring. The only file that touches the DOM by id                      |
-| `src/styles.css`       | All styling. Tokens at the top                                                       |
+| `src/app.ts`           | Page state and wiring, exported as `startApp(hooks)`. The only file that touches the DOM by id |
+| `src/landing.ts`       | Entry for `/`: starts the app and mounts the 3D strip that mirrors it                |
+| `src/three/`           | `model.ts` parts, `scene.ts` the reusable scene, `main.ts` the `/3d/` inspector page |
+| `src/styles.css`       | All styling. Tokens at the top. `landing.css` adds the 3D strip                      |
 | `index.html`           | Markup only                                                                          |
 | `scripts/selftest.ts`  | Live check against the API test vector and feed                                      |
 | `scripts/slopcheck.py` | Flags AI-writing artefacts in markdown                                               |

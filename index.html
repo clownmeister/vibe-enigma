@@ -15,6 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Special+Elite&family=JetBrains+Mono:wght@400;700&display=swap"
     />
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/landing.css" />
   </head>
   <body>
     <div class="wrap">
@@ -55,6 +56,20 @@
         </div>
         <div class="all" id="all-list"></div>
         <div class="auto" aria-hidden="true"><i id="auto-bar"></i></div>
+      </section>
+
+      <!-- the machine itself, live: drums turn and the lamp lights as you type below -->
+      <section class="stage" id="stage" aria-label="The Enigma I in three dimensions">
+        <canvas id="stage-canvas"></canvas>
+        <button class="stage-open" id="stage-open" aria-expanded="false">examine</button>
+        <div class="stage-tools" id="stage-tools" hidden>
+          <label for="explode">Pull apart <output id="explode-out">0</output></label>
+          <input type="range" id="explode" min="0" max="100" value="0" />
+          <button id="stage-close">back to the desk</button>
+        </div>
+        <p class="stage-fallback" id="stage-fallback" hidden>
+          The 3D view needs WebGL. The machine below still works.
+        </p>
       </section>
 
       <section class="machine">
@@ -107,20 +122,6 @@
           </div>
           <div class="out" id="output" aria-live="polite"></div>
         </div>
-        <div class="lid">
-          <button id="inside" class="pulse" aria-expanded="false">look inside</button>
-          <div class="inside" id="inside-panel" hidden>
-            <div class="inside-body">
-              <div class="inside-head">
-                <span
-                  >Wiring at the current rotor positions. Tap two letters on the right to patch them.</span
-                >
-                <span><i class="sw fwd"></i> in <i class="sw back"></i> back</span>
-              </div>
-              <div class="diagram" id="wiring"></div>
-            </div>
-          </div>
-        </div>
       </section>
 
       <footer>
@@ -147,6 +148,6 @@
         </span>
       </footer>
     </div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/landing.ts"></script>
   </body>
 </html>
