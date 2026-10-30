@@ -100,8 +100,8 @@
   .lamp{aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--lamp-dim);
     background:radial-gradient(circle at 40% 35%,#242424,#0a0a0a 70%);border:1.5px solid #2e2e2e;transition:background .08s,color .08s,box-shadow .3s}
   .lamp.on{background:radial-gradient(circle at 40% 35%,#f7e3a6,var(--lamp) 60%,#b58a2e);color:#2a1e0c;border-color:#d1b06a}
-  .path{min-height:64px}
-  .path svg{width:100%;height:64px;display:block;overflow:visible}
+  .path{min-height:80px}
+  .path svg{width:100%;height:80px;display:block;overflow:visible}
   .path text{font:700 12px var(--mono);fill:#bbb;text-anchor:middle}
   .path text.lbl{font:10px var(--mono);fill:#666;letter-spacing:.08em}
   .path text.hot{fill:var(--lamp)}
@@ -412,7 +412,7 @@ function drawPath(p) {
       <text class="${hot}" x="${x}" y="${y(i) + 4}">${p[i]}</text>
       <text class="lbl" x="${x}" y="${y(i) + (i <= n + 2 ? -15 : 24)}">${l}</text>`;
   }).join('');
-  $('#path').innerHTML = `<svg viewBox="0 -8 ${W} ${H + 8}" preserveAspectRatio="xMidYMid meet" aria-label="signal path">
+  $('#path').innerHTML = `<svg viewBox="0 -8 ${W} ${H + 16}" preserveAspectRatio="xMidYMid meet" aria-label="signal path">
     <polyline points="${pts}"/>${boxes}
     <circle class="pulse" r="3.5"><animateMotion dur="1.1s" fill="freeze" path="M${pts.replace(/ /g, ' L')}"/></circle></svg>`;
 }
