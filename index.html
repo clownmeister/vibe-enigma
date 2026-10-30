@@ -399,6 +399,7 @@ function recompute() {
   writeHash();
 }
 
+const show = { timer: 0, text: '' };
 // the letter's journey: in, plugboard, rotors right to left, reflector, back, plugboard, out
 function drawPath(p) {
   const n = state.config.order.length, names = [...state.config.order].reverse();
@@ -412,9 +413,12 @@ function drawPath(p) {
       <text class="${hot}" x="${x}" y="${y(i) + 4}">${p[i]}</text>
       <text class="lbl" x="${x}" y="${y(i) + (i <= n + 2 ? -15 : 24)}">${l}</text>`;
   }).join('');
+  // the pulse rides under the boxes, fades in and out, and is skipped while play mode types (no time to finish)
+  const pulse = show.timer ? '' : `<circle class="pulse" r="3.5" opacity="0">
+      <animateMotion begin="0.15s" dur="1.1s" fill="freeze" path="M${pts.replace(/ /g, ' L')}"/>
+      <animate attributeName="opacity" begin="0.15s" dur="1.1s" fill="freeze" keyTimes="0;0.15;0.85;1" values="0;1;1;0"/></circle>`;
   $('#path').innerHTML = `<svg viewBox="0 -8 ${W} ${H + 16}" preserveAspectRatio="xMidYMid meet" aria-label="signal path">
-    <polyline points="${pts}"/>${boxes}
-    <circle class="pulse" r="3.5"><animateMotion dur="1.1s" fill="freeze" path="M${pts.replace(/ /g, ' L')}"/></circle></svg>`;
+    <polyline points="${pts}"/>${pulse}${boxes}</svg>`;
 }
 
 // ---------- feed ----------
@@ -505,7 +509,6 @@ $('#share').onclick = async () => { await navigator.clipboard.writeText(location
 $('#swap').onclick = () => { $('#input').value = $('#output').textContent; lastLen = $('#input').value.length; recompute(); };
 
 // play: the machine types the message itself, one key at a time, drums and lamps and all
-const show = { timer: 0, text: '' };
 function stopShow() { if (!show.timer) return; clearTimeout(show.timer); show.timer = 0; $('#input').value = show.text; lastLen = show.text.length; recompute(); $('#play').textContent = 'play ▸'; }
 function startShow(text) {
   stopShow(); if (!text) return;
