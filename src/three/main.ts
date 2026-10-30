@@ -134,7 +134,15 @@ async function boot(): Promise<void> {
   ui.msg.value = h.msg || 'HELLO DEVFEST';
   rebuildMachine();
   // ?og renders a still for the share image: no chrome, no motion, parts half apart
-  if (new URLSearchParams(location.search).has('og')) {
+  // ?cam=x,y,z&at=x,y,z sets a fixed view; used for verification renders
+  const q = new URLSearchParams(location.search);
+  const cam = q.get('cam')?.split(',').map(Number);
+  const at = q.get('at')?.split(',').map(Number) ?? [0, -0.3, 0.2];
+  if (cam?.length === 3 && at.length === 3) {
+    view.setCamera(cam as [number, number, number], at as [number, number, number]);
+    view.setAutoRotate(false);
+  }
+  if (q.has('og')) {
     document.body.classList.add('og');
     breathing = false;
     showExplode(0.62);

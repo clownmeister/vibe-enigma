@@ -57,6 +57,7 @@ const state = {
   show: { timer: 0, text: '' },
   auto: { timer: 0, pausedUntil: 0 },
   inside: false,
+  recording: false,
   lastPath: [] as number[],
   plugPick: null as number | null,
   lidOnLoad: false,
@@ -94,6 +95,7 @@ const $ = {
   reflector: el<HTMLSelectElement>('reflector'),
   plugboard: el<HTMLInputElement>('plugboard'),
   play: el<HTMLButtonElement>('play'),
+  record: document.getElementById('record') as HTMLButtonElement | null,
   sound: el<HTMLButtonElement>('sound'),
   swap: el<HTMLButtonElement>('swap'),
   input: el<HTMLTextAreaElement>('input'),
@@ -526,6 +528,45 @@ function wire(): void {
     else startShow($.input.value);
   };
   $.input.addEventListener('focus', stopShow);
+
+  // record: every key pressed anywhere on the page goes straight into the machine
+  const setRecording = (on: boolean): void => {
+    state.recording = on;
+    if (!$.record) return;
+    $.record.setAttribute('aria-pressed', String(on));
+    $.record.textContent = on ? 'stop ●' : 'record ●';
+    if (on) {
+      stopShow();
+      $.input.blur();
+    }
+  };
+  if ($.record)
+    $.record.onclick = (): void => {
+      setRecording(!state.recording);
+    };
+  document.addEventListener('keydown', (e) => {
+    if (!state.recording) return;
+    if ((e.target as Element).matches('input,textarea,select')) return;
+    if (e.key === 'Escape') {
+      setRecording(false);
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      $.input.value = $.input.value.slice(0, -1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      $.input.value += ' ';
+      clack(true);
+    } else if (e.key.length === 1) {
+      e.preventDefault();
+      $.input.value += e.key;
+      clack(e.key === ' ');
+    } else return;
+    state.lastLen = $.input.value.length;
+    recompute();
+  });
   $.input.addEventListener('input', (e) => {
     const v = $.input.value;
     const typed = v.length > state.lastLen && (e as InputEvent).inputType !== 'insertFromPaste';

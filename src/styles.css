@@ -322,6 +322,24 @@ h2 .aside {
 h2 .aside button:hover {
   color: #fff;
 }
+#record[aria-pressed='true'] {
+  color: var(--red);
+}
+#record[aria-pressed='true']::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: rec 1s steps(2) infinite;
+}
+@keyframes rec {
+  50% {
+    opacity: 0.2;
+  }
+}
 .lbl {
   font-size: 11px;
   color: #8d8d8d;

@@ -411,21 +411,134 @@ export function makeLampboard(alphabet: string, layout: string[]): BoardPart {
   };
 }
 
+/** The keyboard: 26 round keys in QWERTZ rows, the one being pressed sits lower. */
+export function makeKeyboard(alphabet: string, layout: string[]): BoardPart {
+  const group = new THREE.Group();
+  const w = 3.6,
+    h = 1.25;
+  group.add(shadowed(new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, h), bakelite)));
+  const keyMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.1, roughness: 0.45 });
+  const keys = boardSockets(
+    alphabet,
+    layout,
+    w,
+    h,
+    (x, z) => {
+      const k = new THREE.Group();
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.1, 8), steel);
+      stem.position.y = 0.08;
+      k.add(stem);
+      const cap = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.05, 20), keyMat));
+      cap.position.y = 0.16;
+      k.add(cap);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.012, 8, 24), brass);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 0.185;
+      k.add(ring);
+      const holder = new THREE.Mesh(new THREE.BoxGeometry(0.001, 0.001, 0.001));
+      holder.position.set(x, 0, z);
+      holder.add(k);
+      return holder;
+    },
+    group,
+  );
+  const letters = letterSheet(alphabet, layout, w, h);
+  letters.position.y = 0.19;
+  group.add(letters);
+  return {
+    group,
+    restX: 0,
+    explodeRank: 0,
+    socket(i) {
+      const k = keys.get(i);
+      return group.localToWorld(k ? k.position.clone().setY(0.19) : new THREE.Vector3());
+    },
+    setLit(i) {
+      for (const [k, m] of keys) m.children[0]?.position.setY(k === i ? -0.03 : 0);
+    },
+    setPairs() {
+      // keys carry no cables
+    },
+  };
+}
+
+/** A transparent sheet with the key letters painted where each key sits. */
+function letterSheet(alphabet: string, layout: string[], w: number, h: number): THREE.Mesh {
+  const c = document.createElement('canvas');
+  c.width = 1024;
+  c.height = Math.round((1024 * h) / w);
+  const ctx = c.getContext('2d');
+  if (ctx) {
+    ctx.font = 'bold 34px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#f2ecdc';
+    const cols = Math.max(...layout.map((r) => r.length));
+    layout.forEach((row, r) => {
+      const offset = (cols - row.length) / 2;
+      row.split('').forEach((L, col) => {
+        if (!alphabet.includes(L)) return;
+        const x = ((col + offset + 0.5) / cols - 0.5) * ((w - 0.3) / w) + 0.5;
+        const z = ((r + 0.5) / layout.length - 0.5) * ((h - 0.3) / h) + 0.5;
+        ctx.fillText(L, x * c.width, z * c.height);
+      });
+    });
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
+  );
+  m.rotation.x = -Math.PI / 2;
+  return m;
+}
+
 /** The wooden case. The lid hinges along the back edge; rotate `lid` about x to open it. */
-export function makeCase(): { base: THREE.Group; lid: THREE.Group } {
+export function makeCase(): { base: THREE.Group; lid: THREE.Group; flap: THREE.Group } {
   const base = new THREE.Group();
   const floor = shadowed(new THREE.Mesh(new THREE.BoxGeometry(CASE.w, 0.12, CASE.d), wood));
   floor.position.y = CASE.floorY;
   base.add(floor);
+  // the front wall is a flap hinged at the bottom; it drops to expose the plugboard, as on the real case
+  const flap = new THREE.Group();
+  const front = shadowed(new THREE.Mesh(new THREE.BoxGeometry(CASE.w, 1.5, 0.1), wood));
+  front.position.y = 0.75;
+  flap.add(front);
+  for (const hx of [-1.9, 1.9]) {
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 12), brass);
+    barrel.rotation.z = Math.PI / 2;
+    barrel.position.set(hx, 0, 0.07);
+    flap.add(barrel);
+  }
+  flap.position.set(0, CASE.floorY + 0.06, CASE.d / 2);
+  base.add(flap);
   for (const [x, z, w, d] of [
     [-2.55, 0, 0.1, CASE.d],
     [2.55, 0, 0.1, CASE.d],
     [0, -2.05, CASE.w, 0.1],
-    [0, 2.05, CASE.w, 0.1],
   ] as const) {
     const wall = shadowed(new THREE.Mesh(new THREE.BoxGeometry(w, 1.5, d), wood));
     wall.position.set(x, -0.8, z);
     base.add(wall);
+  }
+  // a darker band along the floor edges reads as the shadow a real box carries inside
+  const shade = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+  });
+  for (const [x, z, w, d] of [
+    [-2.3, 0, 0.4, CASE.d - 0.2],
+    [2.3, 0, 0.4, CASE.d - 0.2],
+    [0, -1.8, CASE.w - 0.2, 0.4],
+    [0, 1.8, CASE.w - 0.2, 0.4],
+  ] as const) {
+    const band = new THREE.Mesh(new THREE.PlaneGeometry(w, d), shade);
+    band.rotation.x = -Math.PI / 2;
+    band.position.set(x, CASE.floorY + 0.065, z);
+    base.add(band);
   }
   const lid = new THREE.Group();
   const top = shadowed(new THREE.Mesh(new THREE.BoxGeometry(CASE.w, 0.12, CASE.d), wood));
@@ -450,8 +563,8 @@ export function makeCase(): { base: THREE.Group; lid: THREE.Group } {
   }
   for (const lx of [-1.6, 1.6]) {
     const latch = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.2, 0.04), brass);
-    latch.position.set(lx, CASE.rimY - 0.16, CASE.d / 2 + 0.07);
-    base.add(latch);
+    latch.position.set(lx, 1.5 - 0.16, 0.07);
+    flap.add(latch);
     const keeper = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.04), brass);
     keeper.position.set(lx, 0.12, CASE.d - 0.05 + 0.07);
     lid.add(keeper);
@@ -461,14 +574,13 @@ export function makeCase(): { base: THREE.Group; lid: THREE.Group } {
     [-2.5, 0, 0.12, CASE.d - 0.1],
     [2.5, 0, 0.12, CASE.d - 0.1],
     [0, -2.0, CASE.w - 0.1, 0.12],
-    [0, 2.0, CASE.w - 0.1, 0.12],
   ] as const) {
     const strip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), wood);
     strip.position.set(x, CASE.rimY + 0.03, z);
     base.add(strip);
   }
   lid.position.set(0, CASE.rimY, -CASE.d / 2);
-  return { base, lid };
+  return { base, lid, flap };
 }
 
 /** A cable bundle along a polyline, for the harness from the entry wheel to the boards. */

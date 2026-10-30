@@ -12,6 +12,7 @@ import {
   makeBundle,
   makeCase,
   makeEntryWheel,
+  makeKeyboard,
   makeLampboard,
   makePlugboard,
   makeReflector,
@@ -46,6 +47,8 @@ export interface EnigmaScene {
   /** Camera framing: 'strip' for a wide shallow view, 'full' for the stage. */
   setFraming(mode: 'strip' | 'full'): void;
   setAutoRotate(on: boolean): void;
+  /** Put the camera somewhere and look at a point. */
+  setCamera(pos: [number, number, number], target: [number, number, number]): void;
   resize(): void;
   dispose(): void;
 }
@@ -110,17 +113,26 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
   }
   const entry: DiscPart = makeEntryWheel(x + 0.06, count + 1);
   const rows = alphabet === LATIN ? LAMP_ROWS : (alphabet.match(/.{1,9}/g) ?? []);
+  // the real deck, front to back: plugboard behind the flap, keyboard, lampboard, rotors at the back
+  const ROT_Z = -1.0;
   const plugboard: BoardPart = makePlugboard(alphabet, rows);
-  plugboard.group.position.set(0, -1.3, 1.25);
+  plugboard.group.position.set(0, -1.42, 1.6);
+  plugboard.group.scale.set(0.9, 1, 0.55);
+  const keyboard: BoardPart = makeKeyboard(alphabet, rows);
+  keyboard.group.position.set(0, -1.3, 0.6);
   const lampboard: BoardPart = makeLampboard(alphabet, rows);
-  lampboard.group.position.set(0, -1.3, -1.2);
-  const { base, lid } = makeCase();
+  lampboard.group.position.set(0, -1.3, -0.6);
+  reflector.group.position.z = ROT_Z;
+  entry.group.position.z = ROT_Z;
+  for (const r of rotors) r.group.position.z = ROT_Z;
+  const { base, lid, flap } = makeCase();
   const axle = new THREE.Mesh(
     new THREE.CylinderGeometry(0.1, 0.1, total + 1.2, 24),
     new THREE.MeshStandardMaterial({ color: 0x8a8a8a, metalness: 0.9, roughness: 0.3 }),
   );
   axle.rotation.z = Math.PI / 2;
-  scene.add(base, lid, axle, reflector.group, entry.group, plugboard.group, lampboard.group);
+  axle.position.z = ROT_Z;
+  scene.add(base, lid, axle, reflector.group, entry.group, plugboard.group, lampboard.group, keyboard.group);
   for (const r of rotors) scene.add(r.group);
 
   // the harness: a bundle from behind the entry wheel down the right wall and along the floor to each board
@@ -131,20 +143,20 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
     harness.clear();
     const ex = Math.min(entry.group.position.x + 0.5, CASE.w / 2 - 0.25); // stays inside the right wall
     const toPlug = [
-      new THREE.Vector3(ex - 0.2, 0, 0),
-      new THREE.Vector3(ex, -0.2, 0.2),
-      new THREE.Vector3(ex, FLOOR, 0.4),
+      new THREE.Vector3(ex - 0.2, 0, ROT_Z),
+      new THREE.Vector3(ex, -0.2, ROT_Z + 0.2),
+      new THREE.Vector3(ex, FLOOR, ROT_Z + 0.4),
       new THREE.Vector3(ex, FLOOR, plugboard.group.position.z - 0.5),
       new THREE.Vector3(0.6, FLOOR, plugboard.group.position.z - 0.5),
       new THREE.Vector3(0, FLOOR + 0.1, plugboard.group.position.z - 0.3),
     ];
     const toLamp = [
-      new THREE.Vector3(ex - 0.2, 0, 0),
-      new THREE.Vector3(ex, -0.2, -0.2),
-      new THREE.Vector3(ex, FLOOR, -0.4),
-      new THREE.Vector3(ex, FLOOR, lampboard.group.position.z + 0.5),
-      new THREE.Vector3(0.6, FLOOR, lampboard.group.position.z + 0.5),
-      new THREE.Vector3(0, FLOOR + 0.1, lampboard.group.position.z + 0.3),
+      new THREE.Vector3(ex - 0.2, 0, ROT_Z),
+      new THREE.Vector3(ex, -0.2, ROT_Z + 0.1),
+      new THREE.Vector3(ex, FLOOR, ROT_Z + 0.2),
+      new THREE.Vector3(ex, FLOOR, lampboard.group.position.z),
+      new THREE.Vector3(0.6, FLOOR, lampboard.group.position.z),
+      new THREE.Vector3(0, FLOOR + 0.1, lampboard.group.position.z),
     ];
     harness.add(makeBundle(toPlug), makeBundle(toLamp));
   };
@@ -159,20 +171,24 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
   const fwdMat = new THREE.MeshBasicMaterial({ color: 0xe3b556, transparent: true, opacity: 0.9 });
   const backMat = new THREE.MeshBasicMaterial({ color: 0xddd6c4, transparent: true, opacity: 0.9 });
 
+  // pulled fully apart, the entry wheel stops short of the right wall; everything scales to that
+  const gap = Math.min(EXPLODE_GAP, (CASE.w / 2 - 0.45 - entry.restX) / (entry.explodeRank - 0.4));
   function layout(): void {
     // the lid swings open over the first third of the slider, the parts separate after that
     const lidT = Math.min(1, explode / LID_PART);
     const t = Math.max(0, (explode - LID_PART) / (1 - LID_PART));
-    reflector.group.position.x = reflector.restX - t * EXPLODE_GAP * 0.4;
-    for (const r of rotors) r.group.position.x = r.restX + t * EXPLODE_GAP * (r.explodeRank - 0.4);
-    entry.group.position.x = entry.restX + t * EXPLODE_GAP * (entry.explodeRank - 0.4);
+    reflector.group.position.x = reflector.restX - t * gap * 0.4;
+    for (const r of rotors) r.group.position.x = r.restX + t * gap * (r.explodeRank - 0.4);
+    entry.group.position.x = entry.restX + t * gap * (entry.explodeRank - 0.4);
     lid.rotation.x = -lidT * 1.95; // swings back on its hinge
+    flap.rotation.x = lidT * 1.5; // the front drops forward on its bottom hinge
     // the boards lift and tilt toward the viewer, staying inside the case
-    plugboard.group.position.y = -1.3 + t * 0.9;
-    plugboard.group.rotation.x = -t * 0.55;
-    lampboard.group.position.y = -1.3 + t * 0.9;
-    lampboard.group.rotation.x = t * 0.55;
-    axle.scale.y = 1 + t * 1.4;
+    plugboard.group.position.y = -1.42 + t * 0.5;
+    keyboard.group.position.y = -1.3 + t * 0.7;
+    keyboard.group.rotation.x = t * 0.45; // key tops tip toward the viewer
+    lampboard.group.position.y = -1.3 + t * 0.35;
+    lampboard.group.rotation.x = t * 0.3;
+    axle.scale.y = 1 + t * (gap / EXPLODE_GAP) * 1.4;
     rebuildHarness();
   }
 
@@ -185,6 +201,7 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
     plugboard.setPairs(state.pairs);
     const lit = state.path.length ? (state.path[state.path.length - 1] ?? null) : null;
     lampboard.setLit(lit);
+    keyboard.setLit(state.path.length ? (state.path[0] ?? null) : null);
   }
 
   function drawBeam(): void {
@@ -201,17 +218,26 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
     // ride the harness between the entry wheel and a board
     const viaHarness = (contact: THREE.Vector3, socket: THREE.Vector3, sign: 1 | -1): THREE.Vector3[] => [
       contact,
-      new THREE.Vector3(ex - 0.2, 0, sign * 0.1),
-      new THREE.Vector3(ex, FLOOR, sign * 0.4),
-      new THREE.Vector3(ex, FLOOR, socket.z - sign * 0.5),
-      new THREE.Vector3(socket.x, FLOOR + 0.05, socket.z - sign * 0.4),
+      new THREE.Vector3(ex - 0.2, 0, ROT_Z + sign * 0.1),
+      new THREE.Vector3(ex, FLOOR, ROT_Z + sign * 0.4),
+      new THREE.Vector3(ex, FLOOR, socket.z - sign * 0.4),
+      new THREE.Vector3(socket.x, FLOOR + 0.05, socket.z - sign * 0.3),
       socket,
     ];
     const rtl = [...rotors].reverse();
     const fwd: THREE.Vector3[] = [];
-    const keyIn = plugboard.socket(p(0));
+    const keyIn = keyboard.socket(p(0));
+    const plugIn = plugboard.socket(p(0));
     const plugOut = plugboard.socket(p(1));
-    fwd.push(lift(keyIn, -0.4), keyIn, lift(keyIn, 0.3), lift(plugOut, 0.3), plugOut);
+    fwd.push(
+      keyIn,
+      lift(keyIn, -0.25),
+      lift(plugIn, 0.2),
+      plugIn,
+      lift(plugIn, 0.25),
+      lift(plugOut, 0.25),
+      plugOut,
+    );
     fwd.push(
       ...viaHarness(entry.contact(p(1)), plugOut, 1)
         .reverse()
@@ -234,8 +260,8 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
     const plugBack = plugboard.socket(p(2 * R + 2));
     back.push(...viaHarness(entry.contact(p(2 * R + 2)), plugBack, 1));
     const lamp = lampboard.socket(p(2 * R + 3));
-    back.push(lift(plugBack, 0.3), new THREE.Vector3(plugBack.x, FLOOR, plugBack.z - 0.7));
-    back.push(new THREE.Vector3(lamp.x, FLOOR, lamp.z + 0.7), lamp);
+    back.push(lift(plugBack, 0.3), new THREE.Vector3(plugBack.x, FLOOR - 0.02, plugBack.z - 0.4));
+    back.push(new THREE.Vector3(lamp.x, FLOOR - 0.02, lamp.z + 0.5), lamp);
     beam = new THREE.Group();
     beam.add(tube(fwd, fwdMat), tube(back, backMat));
     scene.add(beam);
@@ -313,18 +339,23 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
     setFraming(mode) {
       framing = mode;
       if (mode === 'strip') {
-        controls.target.set(0, -0.1, 0.2);
-        camera.position.set(2.8, 2.3, 7.8);
+        controls.target.set(0, -0.3, 0.1);
+        camera.position.set(2.6, 2.6, 7.6);
         controls.autoRotateSpeed = 0.35;
       } else {
-        controls.target.set(0, -0.3, 0.2);
-        camera.position.set(3.2, 2.4, 7.4);
+        controls.target.set(0, -0.4, 0.1);
+        camera.position.set(3.2, 2.8, 7.4);
         controls.autoRotateSpeed = 0.5;
       }
       resize();
     },
     setAutoRotate(on) {
       controls.autoRotate = on;
+    },
+    setCamera(pos, target) {
+      camera.position.set(...pos);
+      controls.target.set(...target);
+      controls.update();
     },
     resize,
     dispose() {
