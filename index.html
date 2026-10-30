@@ -403,7 +403,7 @@ function recompute() {
 function drawPath(p) {
   const n = state.config.order.length, names = [...state.config.order].reverse();
   const labels = ['in', 'plug', ...names, 'ukw', ...[...names].reverse(), 'out'];
-  const W = 600, H = 64, k = labels.length, step = W / k, bw = Math.min(30, step - 6);
+  const W = Math.max(300, $('#path').clientWidth || 600), H = 64, k = labels.length, step = W / k, bw = Math.min(30, step - 6);
   const y = (i) => (i <= n + 2 ? 20 : 44); // forward leg on the top row, return leg below
   const pts = labels.map((_, i) => `${step * i + step / 2},${y(i)}`).join(' ');
   const boxes = labels.map((l, i) => {
@@ -542,6 +542,7 @@ $('#rotors').addEventListener('keydown', (e) => {
   else if (L.length === 1 && A.includes(L)) { state.config.start = state.config.start.slice(0, i) + L + state.config.start.slice(i + 1); setDrums(state.config.start); recompute(); }
 });
 $('#reflector').onchange = recompute; $('#plugboard').oninput = recompute;
+let rsz; addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => state.config && recompute(), 150); });
 
 setInterval(() => {
   $('#clock').textContent = new Date().toLocaleTimeString();
