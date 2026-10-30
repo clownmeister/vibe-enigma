@@ -125,3 +125,8 @@ textarea:focus {
     padding: 10px 12px;
   }
 }
+
+body.og header,
+body.og .panel {
+  display: none;
+}

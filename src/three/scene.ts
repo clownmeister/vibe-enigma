@@ -45,6 +45,7 @@ export interface EnigmaScene {
   setInteractive(on: boolean): void;
   /** Camera framing: 'strip' for a wide shallow view, 'full' for the stage. */
   setFraming(mode: 'strip' | 'full'): void;
+  setAutoRotate(on: boolean): void;
   resize(): void;
   dispose(): void;
 }
@@ -128,7 +129,7 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
   scene.add(harness);
   const rebuildHarness = (): void => {
     harness.clear();
-    const ex = entry.group.position.x + 0.5;
+    const ex = Math.min(entry.group.position.x + 0.5, CASE.w / 2 - 0.25); // stays inside the right wall
     const toPlug = [
       new THREE.Vector3(ex - 0.2, 0, 0),
       new THREE.Vector3(ex, -0.2, 0.2),
@@ -166,10 +167,11 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
     for (const r of rotors) r.group.position.x = r.restX + t * EXPLODE_GAP * (r.explodeRank - 0.4);
     entry.group.position.x = entry.restX + t * EXPLODE_GAP * (entry.explodeRank - 0.4);
     lid.rotation.x = -lidT * 1.95; // swings back on its hinge
-    plugboard.group.position.z = 1.25 + t * 1.5;
-    plugboard.group.rotation.x = t * 0.45;
-    lampboard.group.position.z = -1.2 - t * 1.5;
-    lampboard.group.rotation.x = -t * 0.45;
+    // the boards lift and tilt toward the viewer, staying inside the case
+    plugboard.group.position.y = -1.3 + t * 0.9;
+    plugboard.group.rotation.x = -t * 0.55;
+    lampboard.group.position.y = -1.3 + t * 0.9;
+    lampboard.group.rotation.x = t * 0.55;
     axle.scale.y = 1 + t * 1.4;
     rebuildHarness();
   }
@@ -195,7 +197,7 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
     if (path.length !== 2 * R + 4) return;
     const p = (i: number): number => path[i] ?? 0;
     const lift = (v: THREE.Vector3, dy: number): THREE.Vector3 => v.clone().add(new THREE.Vector3(0, dy, 0));
-    const ex = entry.group.position.x + 0.5;
+    const ex = Math.min(entry.group.position.x + 0.5, CASE.w / 2 - 0.25); // stays inside the right wall
     // ride the harness between the entry wheel and a board
     const viaHarness = (contact: THREE.Vector3, socket: THREE.Vector3, sign: 1 | -1): THREE.Vector3[] => [
       contact,
@@ -320,6 +322,9 @@ export function createEnigmaScene(canvas: HTMLCanvasElement, desc: MachineDescri
         controls.autoRotateSpeed = 0.5;
       }
       resize();
+    },
+    setAutoRotate(on) {
+      controls.autoRotate = on;
     },
     resize,
     dispose() {

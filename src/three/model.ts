@@ -132,33 +132,42 @@ export function makeRotor(alphabet: string, restX: number, explodeRank: number):
   const drum = new THREE.Group(); // the part that turns
   group.add(drum);
 
+  // the bakelite core
   const body = shadowed(
-    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 0.92, ROTOR_R * 0.92, ROTOR_T, 64), bakelite),
+    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 0.9, ROTOR_R * 0.9, ROTOR_T, 64), bakelite),
   );
   body.rotation.z = Math.PI / 2;
   drum.add(body);
 
-  // the letter ring, slightly proud of the body
-  const rim = new THREE.Mesh(
-    new THREE.CylinderGeometry(ROTOR_R, ROTOR_R, ROTOR_T * 0.55, 64, 1, true),
-    new THREE.MeshStandardMaterial({ map: letterRim(alphabet), metalness: 0.1, roughness: 0.7 }),
+  // the alphabet tyre: a solid ring on the left two thirds of the rim, letters engraved around it
+  const tyreW = ROTOR_T * 0.6;
+  const tyre = shadowed(
+    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R, ROTOR_R, tyreW, 64), [
+      new THREE.MeshStandardMaterial({ map: letterRim(alphabet), metalness: 0.1, roughness: 0.7 }),
+      bakelite,
+      bakelite,
+    ]),
   );
-  rim.rotation.z = Math.PI / 2;
-  rim.rotation.y = Math.PI / 2;
-  drum.add(rim);
+  tyre.rotation.z = Math.PI / 2;
+  tyre.rotation.y = Math.PI / 2;
+  tyre.position.x = -ROTOR_T / 2 + tyreW / 2 + 0.02;
+  drum.add(tyre);
 
-  // brass thumb ring with the finger notches a hand turns the drum by
-  const thumb = new THREE.Mesh(new THREE.TorusGeometry(ROTOR_R * 0.95, 0.03, 10, 64), brass);
-  thumb.rotation.y = Math.PI / 2;
-  thumb.position.x = ROTOR_T / 2 - 0.02;
-  drum.add(thumb);
-  const notch = new THREE.BoxGeometry(0.06, 0.05, 0.12);
+  // the finger wheel: a serrated brass ring on the right edge, a touch larger than the tyre
+  const wheelW = ROTOR_T * 0.22;
+  const wheel = shadowed(
+    new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 1.02, ROTOR_R * 1.02, wheelW, 64), brass),
+  );
+  wheel.rotation.z = Math.PI / 2;
+  wheel.position.x = ROTOR_T / 2 - wheelW / 2;
+  drum.add(wheel);
+  const tooth = new THREE.BoxGeometry(wheelW, 0.05, 0.09);
   for (let i = 0; i < N; i++) {
-    const n = new THREE.Mesh(notch, brass);
+    const t = new THREE.Mesh(tooth, brass);
     const a = contactAngle(i) + Math.PI / N;
-    n.position.set(ROTOR_T / 2 - 0.02, Math.sin(a) * ROTOR_R * 0.96, Math.cos(a) * ROTOR_R * 0.96);
-    n.rotation.x = -a;
-    drum.add(n);
+    t.position.set(wheel.position.x, Math.sin(a) * ROTOR_R * 1.03, Math.cos(a) * ROTOR_R * 1.03);
+    t.rotation.x = -a;
+    drum.add(t);
   }
 
   drum.add(ringOfPins(ROTOR_T / 2 + 0.02));
@@ -222,8 +231,9 @@ export function makeReflector(restX: number): DiscPart {
   );
   body.rotation.z = Math.PI / 2;
   group.add(body);
-  const plate = new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 0.6, ROTOR_R * 0.6, 0.32, 64), brass);
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(ROTOR_R * 0.6, ROTOR_R * 0.6, 0.04, 64), brass);
   plate.rotation.z = Math.PI / 2;
+  plate.position.x = 0.16;
   group.add(plate);
   group.add(ringOfPins(0.17));
   const tmp = new THREE.Vector3();
@@ -414,9 +424,32 @@ export function makeCase(): { base: THREE.Group; lid: THREE.Group } {
     wall.position.set(x, 0.45, z);
     lid.add(wall);
   }
-  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, CASE.w * 0.96, 12), brass);
-  hinge.rotation.z = Math.PI / 2;
-  lid.add(hinge);
+  // two brass hinge barrels at the back, two latches at the front, a lip the lid closes over
+  for (const hx of [-1.8, 1.8]) {
+    const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 12), brass);
+    hinge.rotation.z = Math.PI / 2;
+    hinge.position.x = hx;
+    lid.add(hinge);
+  }
+  for (const lx of [-1.6, 1.6]) {
+    const latch = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.2, 0.04), brass);
+    latch.position.set(lx, CASE.rimY - 0.16, CASE.d / 2 + 0.07);
+    base.add(latch);
+    const keeper = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.04), brass);
+    keeper.position.set(lx, 0.1, CASE.d - 0.05 + 0.07);
+    lid.add(keeper);
+  }
+  // a thin lip frame around the opening for the lid to close over
+  for (const [x, z, w, d] of [
+    [-2.5, 0, 0.12, CASE.d - 0.1],
+    [2.5, 0, 0.12, CASE.d - 0.1],
+    [0, -2.0, CASE.w - 0.1, 0.12],
+    [0, 2.0, CASE.w - 0.1, 0.12],
+  ] as const) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), wood);
+    strip.position.set(x, CASE.rimY + 0.03, z);
+    base.add(strip);
+  }
   lid.position.set(0, CASE.rimY, -CASE.d / 2);
   return { base, lid };
 }

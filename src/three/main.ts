@@ -133,6 +133,15 @@ async function boot(): Promise<void> {
   const h = hashSettings();
   ui.msg.value = h.msg || 'HELLO DEVFEST';
   rebuildMachine();
+  // ?og renders a still for the share image: no chrome, no motion, parts half apart
+  if (new URLSearchParams(location.search).has('og')) {
+    document.body.classList.add('og');
+    breathing = false;
+    showExplode(0.62);
+    view.setInteractive(false);
+    view.setAutoRotate(false);
+    return;
+  }
   setTimeout(() => requestAnimationFrame(breathe), 800);
 }
 void boot();
