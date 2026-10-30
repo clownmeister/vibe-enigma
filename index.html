@@ -38,6 +38,9 @@
   .sheet::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.35;mix-blend-mode:multiply;
     background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .4 0 0 0 0 .35 0 0 0 0 .25 0 0 0 .16 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E")}
   .sheet>*{position:relative}
+  .sheet.flash{animation:flash .9s ease-out}
+  @keyframes flash{0%{box-shadow:0 0 0 3px var(--red),0 24px 48px -24px rgba(0,0,0,.9)}100%{box-shadow:0 0 0 0 transparent,0 24px 48px -24px rgba(0,0,0,.9)}}
+  @media (prefers-reduced-motion:reduce){.sheet.flash{animation:none}}
   .stamp{margin-left:auto;font:400 12px/1 var(--type);letter-spacing:.2em;text-transform:uppercase;color:var(--red);
     border:1.5px solid var(--red);padding:5px 8px 3px;transform:rotate(-3deg);opacity:.8;mix-blend-mode:multiply}
   .sheet .meta{display:flex;gap:18px;align-items:baseline;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;flex-wrap:wrap}
@@ -90,12 +93,23 @@
   .wiring .lbl{margin:0 8px 0 0;display:inline}
   textarea{width:100%;min-height:70px;padding:10px 12px;border:1px solid #333;background:#000;color:#fff;font:inherit;caret-color:var(--lamp);resize:vertical;text-transform:uppercase;letter-spacing:.04em;border-radius:0}
   textarea:focus{border-color:#777;outline:0}
-  .lamps{display:grid;grid-template-columns:repeat(auto-fill,minmax(32px,1fr));gap:7px;margin:14px 0 10px}
+  .lamps{display:flex;flex-direction:column;gap:7px;margin:14px 0 10px;align-items:center}
+  .lamps .krow{display:flex;gap:7px}
+  .lamp{width:34px}
+  @media (max-width:420px){.lamp{width:30px}.lamps .krow{gap:5px}}
   .lamp{aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--lamp-dim);
     background:radial-gradient(circle at 40% 35%,#242424,#0a0a0a 70%);border:1.5px solid #2e2e2e;transition:background .08s,color .08s,box-shadow .3s}
   .lamp.on{background:radial-gradient(circle at 40% 35%,#f7e3a6,var(--lamp) 60%,#b58a2e);color:#2a1e0c;border-color:#d1b06a}
-  .path{font-size:12px;color:#777;min-height:1.4em}
-  .path b{color:var(--lamp);font-weight:700}
+  .path{min-height:64px}
+  .path svg{width:100%;height:64px;display:block;overflow:visible}
+  .path text{font:700 12px var(--mono);fill:#bbb;text-anchor:middle}
+  .path text.lbl{font:10px var(--mono);fill:#666;letter-spacing:.08em}
+  .path text.hot{fill:var(--lamp)}
+  .path rect{fill:#000;stroke:#333}
+  .path rect.hot{stroke:var(--lamp)}
+  .path polyline{fill:none;stroke:#444;stroke-width:1.2}
+  .path .pulse{fill:var(--lamp)}
+  @media (prefers-reduced-motion:reduce){.path .pulse{display:none}}
   .out{min-height:70px;padding:10px 12px;border:1px solid #222;white-space:pre-wrap;word-break:break-word;font-size:17px;letter-spacing:.04em;background:#000;color:var(--lamp);margin-top:4px}
   .out:empty::before{content:"output";color:#8a8a8a}
   @media (prefers-reduced-motion:reduce){.cyl{transition:none}}
@@ -148,7 +162,7 @@
     </div>
   </div>
   <div>
-    <h2>Keyboard<span class="aside"><button id="sound" aria-pressed="true">sound on</button><button id="swap">swap ⇄</button></span></h2>
+    <h2>Keyboard<span class="aside"><button id="play" title="Type the message letter by letter">play ▸</button><button id="sound" aria-pressed="true">sound on</button><button id="swap">swap ⇄</button></span></h2>
     <textarea id="input" placeholder="Type plaintext or paste ciphertext" spellcheck="false" autocapitalize="characters" autocomplete="off" aria-label="message"></textarea>
     <div class="lamps" id="lamps" aria-hidden="true"></div>
     <div class="path" id="path">&nbsp;</div>
@@ -168,6 +182,7 @@
 import { createMachine, encode } from './enigma.js';
 
 const $ = (s) => document.querySelector(s);
+let lastLen = 0;
 const state = { api: null, config: null, seen: new Set(), lastFetch: 0, interval: 15000, feed: [], cursor: 0, pinned: false };
 
 // ---------- config ----------
@@ -239,7 +254,14 @@ function renderMachine() {
   $('#reflector').innerHTML = c.reflectorBank.map((r) => `<option ${r.name === c.reflector ? 'selected' : ''}>${r.name}</option>`).join('');
   $('#plugboard').value = c.plugboard;
   const lamps = $('#lamps'); lamps.innerHTML = '';
-  c.alphabet.split('').forEach((L) => { const s = document.createElement('div'); s.className = 'lamp'; s.id = `lamp-${L}`; s.textContent = L; lamps.appendChild(s); });
+  // the real Enigma lampboard is QWERTZ in three rows; any other alphabet falls back to rows of nine
+  const QWERTZ = ['QWERTZUIO', 'ASDFGHJK', 'PYXCVBNML'];
+  const rows = c.alphabet === 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' ? QWERTZ : c.alphabet.match(/.{1,9}/g);
+  rows.forEach((row) => {
+    const r = document.createElement('div'); r.className = 'krow';
+    row.split('').forEach((L) => { const s = document.createElement('div'); s.className = 'lamp'; s.id = `lamp-${L}`; s.textContent = L; r.appendChild(s); });
+    lamps.appendChild(r);
+  });
 }
 
 const FACE = 28;
@@ -372,10 +394,27 @@ function recompute() {
   document.querySelectorAll('.lamp.on').forEach((l) => l.classList.remove('on'));
   if (last) {
     $(`#lamp-${last.out}`)?.classList.add('on');
-    const A = m.alphabet, p = last.path.map((i) => A[i]), n = state.config.order.length;
-    $('#path').innerHTML = `<b>${p[0]}</b> → plug ${p[1]} → ${p.slice(2, 2 + n).join(' ')} → reflector ${p[2 + n]} → ${p.slice(3 + n, -1).join(' ')} → plug <b>${p.at(-1)}</b>`;
-  } else $('#path').innerHTML = '&nbsp;';
+    drawPath(last.path.map((i) => m.alphabet[i]));
+  } else $('#path').innerHTML = '';
   writeHash();
+}
+
+// the letter's journey: in, plugboard, rotors right to left, reflector, back, plugboard, out
+function drawPath(p) {
+  const n = state.config.order.length, names = [...state.config.order].reverse();
+  const labels = ['in', 'plug', ...names, 'ukw', ...[...names].reverse(), 'out'];
+  const W = 600, H = 64, k = labels.length, step = W / k, bw = Math.min(30, step - 6);
+  const y = (i) => (i <= n + 2 ? 20 : 44); // forward leg on the top row, return leg below
+  const pts = labels.map((_, i) => `${step * i + step / 2},${y(i)}`).join(' ');
+  const boxes = labels.map((l, i) => {
+    const x = step * i + step / 2, hot = i === 0 || i === k - 1 ? 'hot' : '';
+    return `<rect class="${hot}" x="${x - bw / 2}" y="${y(i) - 11}" width="${bw}" height="22" rx="2"/>
+      <text class="${hot}" x="${x}" y="${y(i) + 4}">${p[i]}</text>
+      <text class="lbl" x="${x}" y="${y(i) + (i <= n + 2 ? -15 : 24)}">${l}</text>`;
+  }).join('');
+  $('#path').innerHTML = `<svg viewBox="0 -8 ${W} ${H + 8}" preserveAspectRatio="xMidYMid meet" aria-label="signal path">
+    <polyline points="${pts}"/>${boxes}
+    <circle class="pulse" r="3.5"><animateMotion dur="1.1s" fill="freeze" path="M${pts.replace(/ /g, ' L')}"/></circle></svg>`;
 }
 
 // ---------- feed ----------
@@ -393,6 +432,11 @@ async function loadFeed() {
     state.cursor = idx >= 0 ? idx : 0;
     $('#feed-status').textContent = `${transmissions.length} on record`;
     renderSheet(); renderAll();
+    if (state.feed[0]?.fresh && state.cursor === 0) {
+      const sh = $('.sheet'); sh.classList.remove('flash'); void sh.offsetWidth; sh.classList.add('flash');
+      // teleprinter burst
+      for (let i = 0; i < 7; i++) setTimeout(() => clack(i % 3 === 2), i * 55);
+    }
   } catch (e) {
     $('#feed-status').textContent = `no signal: ${e.message}`;
   }
@@ -427,8 +471,9 @@ $('#next').onclick = () => { state.cursor = Math.max(0, state.cursor - 1); state
 $('#all').onclick = () => $('#all-list').classList.toggle('open');
 $('#open').onclick = () => {
   const t = state.feed[state.cursor]; if (!t) return;
-  state.config.start = t.start; $('#input').value = t.ciphertext; recompute();
+  state.config.start = t.start; setDrums(t.start);
   $('.machine').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  startShow(t.ciphertext);
 };
 document.addEventListener('keydown', (e) => {
   if (e.target.matches('input,textarea,select')) return;
@@ -439,6 +484,7 @@ document.addEventListener('keydown', (e) => {
 function writeHash() {
   const c = state.config;
   const h = new URLSearchParams({ r: c.order.join(','), s: c.start, g: c.rings, u: c.reflector, p: c.plugboard.trim() });
+  const msg = $('#input').value; if (msg && msg.length <= 600) h.set('m', msg);
   history.replaceState(null, '', `#${h}`);
 }
 function applyHash() {
@@ -449,14 +495,33 @@ function applyHash() {
   if (h.get('g')) c.rings = h.get('g').toUpperCase();
   if (h.get('u')) c.reflector = h.get('u');
   if (h.has('p')) c.plugboard = h.get('p');
+  if (h.get('m')) { $('#input').value = h.get('m'); lastLen = $('#input').value.length; }
 }
 
 // ---------- wiring ----------
 $('#api-base').addEventListener('change', loadConfig);
 $('#reset').onclick = () => { applyFromApi(); renderMachine(); recompute(); };
 $('#share').onclick = async () => { await navigator.clipboard.writeText(location.href); const b = $('#share'); b.textContent = 'copied'; setTimeout(() => (b.textContent = 'share'), 1500); };
-$('#swap').onclick = () => { $('#input').value = $('#output').textContent; recompute(); };
-let lastLen = 0;
+$('#swap').onclick = () => { $('#input').value = $('#output').textContent; lastLen = $('#input').value.length; recompute(); };
+
+// play: the machine types the message itself, one key at a time, drums and lamps and all
+const show = { timer: 0, text: '' };
+function stopShow() { if (!show.timer) return; clearTimeout(show.timer); show.timer = 0; $('#input').value = show.text; lastLen = show.text.length; recompute(); $('#play').textContent = 'play ▸'; }
+function startShow(text) {
+  stopShow(); if (!text) return;
+  show.text = text; $('#play').textContent = 'stop ■';
+  const start = state.config.start; let i = 0;
+  const tick = () => {
+    i++; $('#input').value = text.slice(0, i); lastLen = i;
+    const ch = text[i - 1]; if (ch !== undefined) clack(ch === ' ');
+    recompute();
+    if (i < text.length) show.timer = setTimeout(tick, /[A-Z]/i.test(ch) ? 130 : 60);
+    else { show.timer = 0; $('#play').textContent = 'play ▸'; }
+  };
+  $('#input').value = ''; recompute(); show.timer = setTimeout(tick, 250);
+}
+$('#play').onclick = () => (show.timer ? stopShow() : startShow($('#input').value));
+$('#input').addEventListener('focus', stopShow);
 $('#input').addEventListener('input', (e) => {
   const v = e.target.value;
   if (v.length > lastLen && e.inputType !== 'insertFromPaste') { const ch = v[v.length - 1]; clack(ch === ' '); }
