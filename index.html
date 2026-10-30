@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0b0b">
 <title>Vibe Enigma</title>
 <meta name="description" content="A settable web Enigma that reads the DevFest Vibe Lounge machine from the API and decodes the live agenda feed.">
 <style>
@@ -11,7 +12,7 @@
     --red:#ff3b30;--lamp:#ffd166;--mono:"IBM Plex Mono","JetBrains Mono","SFMono-Regular",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
-  html{background:var(--bg)}
+  html{background:var(--bg);color-scheme:dark;accent-color:var(--red)}
   body{margin:0;color:var(--ink);font:14px/1.5 var(--mono);-webkit-font-smoothing:antialiased}
   ::selection{background:var(--lamp);color:#111}
   :focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
@@ -27,12 +28,15 @@
   .dot.live{background:var(--red);animation:blink 1.2s steps(2) infinite}
   @keyframes blink{50%{opacity:.2}}
   main{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:16px;padding:8px 24px 32px}
-  @media (max-width:900px){main{grid-template-columns:1fr;padding:8px 16px 24px}header{padding:18px 16px 8px}footer{padding:0 16px 24px}}
-  .card{background:var(--panel);border:1px solid var(--line);padding:18px;border-radius:3px}
+  @media (max-width:900px){main{grid-template-columns:1fr;padding:8px 16px 24px}header{padding:18px 16px 8px}footer{padding:0 16px 24px}h1 small{display:block;margin:4px 0 0}.status{gap:10px;font-size:12px}}
+  @media (max-width:480px){#s-test{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
+  @media (pointer:coarse){.nudge button{min-height:32px;padding:0 10px}.tx .meta button{min-height:32px;padding:0 12px}}
+  @media (prefers-reduced-motion:reduce){.dot.live,.tx.fresh{animation:none}}
+  .card{background:var(--panel);border:1px solid var(--line);padding:16px;border-radius:3px}
   .card+.card{margin-top:16px}
-  .card h2{margin:0 0 12px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:12px 0 0}
-  label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+  .card h2{margin:0 0 16px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:16px 0 0}
+  label{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
   select,input,textarea,button{font:inherit;color:inherit}
   select,input[type=text],textarea{padding:6px 8px;border:1px solid #333;border-radius:3px;background:#000;caret-color:var(--lamp)}
   select:hover,input[type=text]:hover,textarea:hover{border-color:#555}
@@ -44,13 +48,13 @@
   .rotor .nudge{display:flex;flex-direction:column;gap:3px}
   .nudge button{padding:0 6px;line-height:16px;border:1px solid #333;background:#000;cursor:pointer;border-radius:2px;font-size:12px}
   .nudge button:hover{border-color:#666}
-  .rotor .ringlbl{grid-column:1/-1;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+  .rotor .ringlbl{grid-column:1/-1;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
   textarea{width:100%;min-height:72px;resize:vertical;text-transform:uppercase;letter-spacing:.04em}
-  .out{min-height:72px;padding:8px;border:1px solid #333;border-radius:3px;white-space:pre-wrap;word-break:break-word;font-size:16px;letter-spacing:.04em;background:#000}
+  .out{min-height:72px;padding:8px;border:1px solid #1c1c1c;border-radius:3px;white-space:pre-wrap;word-break:break-word;font-size:16px;letter-spacing:.04em;background:#060606;color:var(--lamp)}
   .out:empty::before{content:"output appears here";color:var(--dim)}
-  .lamps{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:12px 0 10px}
+  .lamps{display:grid;grid-template-columns:repeat(auto-fill,minmax(32px,1fr));gap:6px;margin:16px 0 8px}
   .lamp{aspect-ratio:1;border-radius:50%;border:1px solid #2a2a2a;display:grid;place-items:center;font-weight:600;color:var(--dim);background:#0a0a0a;transition:background .08s,color .08s,box-shadow .25s}
-  .lamp.on{background:var(--lamp);color:#111;border-color:var(--lamp);box-shadow:0 3px 10px rgba(0,0,0,.6)}
+  .lamp.on{background:var(--lamp);color:#111;border-color:var(--lamp);box-shadow:0 0 0 1px var(--lamp),0 0 18px rgba(255,209,102,.45)}
   .path{font-size:12px;color:var(--muted);min-height:1.4em}
   .path b{color:var(--lamp);font-weight:600}
   button.primary{background:var(--ink);color:#111;border:1px solid var(--ink);padding:7px 14px;border-radius:3px;cursor:pointer;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
@@ -58,7 +62,8 @@
   button.ghost{background:transparent;color:var(--ink);border:1px solid #333;padding:6px 10px;border-radius:3px;cursor:pointer;font-size:12px}
   button.ghost:hover{border-color:#666}
   .feed{display:flex;flex-direction:column;margin-top:12px}
-  .tx{position:relative;padding:12px 0 12px 16px;border-top:1px solid var(--line);animation:fade .35s ease-out}
+  .tx{position:relative;padding:12px 0 12px 16px;border-top:1px solid var(--line)}
+  .tx.fresh{animation:fade .35s ease-out}
   .tx:last-child{border-bottom:1px solid var(--line)}
   .tx::before{content:"";position:absolute;left:0;top:19px;width:6px;height:6px;border-radius:50%;background:#2a2a2a}
   .tx.fresh::before{background:var(--red);}
@@ -66,7 +71,7 @@
   .tx .meta{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-bottom:5px;flex-wrap:wrap;align-items:center;font-variant-numeric:tabular-nums}
   .tx .meta b{color:var(--ink);font-weight:600}
   .tx .meta button{padding:0 7px;font-size:12px;line-height:18px}
-  .tx .plain{font-size:17px;line-height:1.35;color:#fff;letter-spacing:.03em;word-break:break-word;max-width:75ch}
+  .tx .plain{font-size:17px;line-height:1.35;color:var(--ink);letter-spacing:.03em;word-break:break-word;max-width:75ch}
   .tx .cipher{font-size:12px;color:var(--dim);margin-top:5px;word-break:break-word}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:12px}
   .kv span:first-child{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:12px;padding-top:1px}
@@ -100,7 +105,7 @@
         <button class="primary" id="reload">Reload</button>
       </div>
 
-      <label style="margin-top:14px">Rotors, left to right</label>
+      <label style="margin-top:16px">Rotors, left to right</label>
       <div class="rotors" id="rotors"></div>
 
       <div class="row">
@@ -108,8 +113,8 @@
         <div style="flex:1"><label>Plugboard pairs</label><input type="text" id="plugboard" style="width:100%" placeholder="AB CD" aria-label="plugboard pairs"></div>
       </div>
       <div class="row">
-        <button class="primary" id="reset">Reset to API</button>
-        <button class="primary" id="share">Copy share link</button>
+        <button class="ghost" id="reset">Reset to API</button>
+        <button class="ghost" id="share">Copy share link</button>
         <span class="small" id="share-msg"></span>
       </div>
     </div>
