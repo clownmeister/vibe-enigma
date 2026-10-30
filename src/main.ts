@@ -43,6 +43,8 @@ const state = {
   auto: { timer: 0, pausedUntil: 0 },
   inside: false,
   lastPath: [] as number[],
+  plugPick: null as number | null,
+  lidOnLoad: false,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller names the element type
@@ -116,6 +118,12 @@ async function loadConfig(): Promise<void> {
   renderMachine();
   runSelfTest();
   recompute();
+  if (state.lidOnLoad && !state.inside) {
+    state.lidOnLoad = false;
+    setTimeout(() => {
+      $.inside.click();
+    }, 600);
+  }
   await loadFeed();
 }
 
@@ -265,6 +273,7 @@ function drawInside(m: Machine): void {
     path: state.lastPath,
     width: $.wiring.clientWidth - 8,
     still: state.show.timer !== 0,
+    pick: state.plugPick,
   });
 }
 
@@ -569,9 +578,48 @@ function wire(): void {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') touched();
   });
 
-  $.inside.onclick = (): void => {
+  // patching the plugboard from the wiring diagram: first tap picks, second tap pairs or unpairs
+  $.wiring.addEventListener('click', (e) => {
+    const hit = (e.target as Element).closest<SVGElement>('.hit');
+    if (!hit) return;
+    const i = Number(hit.dataset.i);
+    const c = settings();
+    const A = c.alphabet;
+    const L = A[i] ?? '';
+    const pairs = c.plugboard
+      .toUpperCase()
+      .split(/[\s,]+/)
+      .filter((p) => p.length === 2);
+    const existing = pairs.find((p) => p.includes(L));
+    if (state.plugPick === null) {
+      if (existing) {
+        // tapping a patched letter pulls its cable
+        $.plugboard.value = pairs.filter((p) => p !== existing).join(' ');
+        click();
+        recompute();
+        return;
+      }
+      state.plugPick = i;
+    } else if (state.plugPick === i) {
+      state.plugPick = null;
+    } else {
+      const other = A[state.plugPick] ?? '';
+      const kept = pairs.filter((p) => !p.includes(L) && !p.includes(other));
+      $.plugboard.value = [...kept, `${other}${L}`].join(' ');
+      state.plugPick = null;
+      click();
+    }
+    recompute();
+  });
+
+  const openLid = (): void => {
     state.inside = !state.inside;
     $.inside.classList.remove('pulse');
+    try {
+      localStorage.setItem('enigma-lid-seen', '1');
+    } catch {
+      // fine
+    }
     $.inside.setAttribute('aria-expanded', String(state.inside));
     $.inside.textContent = state.inside ? 'close the lid' : 'look inside';
     if (state.inside) {
@@ -588,6 +636,15 @@ function wire(): void {
       }, 600);
     }
   };
+  $.inside.onclick = openLid;
+  // on a laptop the lid starts open the first time, so the wiring is in the first look
+  let seen = false;
+  try {
+    seen = localStorage.getItem('enigma-lid-seen') === '1';
+  } catch {
+    // fine
+  }
+  if (!seen && matchMedia('(min-width: 761px)').matches) state.lidOnLoad = true;
 
   let resizeTimer = 0;
   addEventListener('resize', () => {
