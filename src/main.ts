@@ -4,8 +4,9 @@ import type { MachineDescription, Transmission } from './api';
 import { burst, clack, click, isMuted, setMuted } from './audio';
 import { renderDrum, setDrums, wireDrums } from './drums';
 import { createMachine, encode } from './enigma';
-import type { MachineConfig, ReflectorSpec, RotorSpec } from './enigma';
+import type { Machine, MachineConfig, ReflectorSpec, RotorSpec } from './enigma';
 import { renderPath } from './path';
+import { renderWiring } from './wiring';
 
 interface Settings {
   alphabet: string;
@@ -40,6 +41,8 @@ const state = {
   lastLen: 0,
   show: { timer: 0, text: '' },
   auto: { timer: 0, pausedUntil: 0 },
+  inside: false,
+  lastPath: [] as number[],
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller names the element type
@@ -82,6 +85,9 @@ const $ = {
   posNow: el('pos-now'),
   output: el<HTMLDivElement>('output'),
   apiBase: el<HTMLInputElement>('api-base'),
+  inside: el<HTMLButtonElement>('inside'),
+  insidePanel: el<HTMLDivElement>('inside-panel'),
+  wiring: el<HTMLDivElement>('wiring'),
 };
 
 function settings(): Settings {
@@ -236,6 +242,8 @@ function recompute(): void {
   $.lamps.querySelectorAll('.lamp.on').forEach((l) => {
     l.classList.remove('on');
   });
+  state.lastPath = last ?? [];
+  if (state.inside) drawInside(m);
   const letters = last ? last.map((i) => m.alphabet[i] ?? '') : [];
   const lit = letters[letters.length - 1];
   if (lit) document.getElementById(`lamp-${lit}`)?.classList.add('on');
@@ -246,6 +254,17 @@ function recompute(): void {
     still: state.show.timer !== 0,
   });
   writeHash();
+}
+
+function drawInside(m: Machine): void {
+  const c = settings();
+  $.wiring.innerHTML = renderWiring({
+    alphabet: c.alphabet,
+    order: c.order,
+    snapshot: m.wiring(),
+    path: state.lastPath,
+    width: $.wiring.clientWidth - 8,
+  });
 }
 
 // ---------- play mode ----------
@@ -548,6 +567,26 @@ function wire(): void {
     if (e.key === 'ArrowRight') moveCursor(-1);
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') touched();
   });
+
+  $.inside.onclick = (): void => {
+    state.inside = !state.inside;
+    $.inside.classList.remove('pulse');
+    $.inside.setAttribute('aria-expanded', String(state.inside));
+    $.inside.textContent = state.inside ? 'close the lid' : 'look inside';
+    if (state.inside) {
+      $.insidePanel.hidden = false;
+      recompute();
+      requestAnimationFrame(() => {
+        $.insidePanel.classList.add('open');
+      });
+      click();
+    } else {
+      $.insidePanel.classList.remove('open');
+      setTimeout(() => {
+        $.insidePanel.hidden = !state.inside;
+      }, 600);
+    }
+  };
 
   let resizeTimer = 0;
   addEventListener('resize', () => {

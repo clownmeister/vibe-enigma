@@ -31,8 +31,19 @@ export interface EncodedChar {
   path: number[] | null;
 }
 
+/** The machine's wiring at its current rotor positions, for drawing. */
+export interface WiringSnapshot {
+  /** plug[i] is where contact i goes through the plugboard. */
+  plugboard: number[];
+  /** One table per rotor, right to left: table[i] is the output contact for input contact i, at the current offset. */
+  rotors: number[][];
+  /** reflector[i] is the partner contact of i. */
+  reflector: number[];
+}
+
 export interface Machine {
   readonly alphabet: string;
+  wiring(): WiringSnapshot;
   encodeChar(ch: string): EncodedChar;
   encode(text: string): string;
   /** Current rotor positions, left to right. */
@@ -142,8 +153,17 @@ export function createMachine(config: MachineConfig, start: string): Machine {
     return { out: alpha[c] ?? ch, path };
   }
 
+  function wiring(): WiringSnapshot {
+    return {
+      plugboard: [...plug],
+      rotors: rotors.map((r) => alpha.split('').map((_, i) => through(r, i, r.fwd, n))),
+      reflector: [...reflector],
+    };
+  }
+
   return {
     alphabet: alpha,
+    wiring,
     encodeChar,
     encode: (text) =>
       text

@@ -12,6 +12,7 @@ Live: https://clownmeister.github.io/vibe-enigma/
 | `src/api.ts`           | The lounge API types and fetchers                                                    |
 | `src/drums.ts`         | 3D letter drums: render, turn, drag, flick, wheel, keys                              |
 | `src/path.ts`          | The signal-path SVG                                                                  |
+| `src/wiring.ts`        | The look-inside wiring diagram                                                       |
 | `src/audio.ts`         | Synthesised clicks, clacks, teleprinter burst, mute                                  |
 | `src/main.ts`          | Page state and wiring. The only file that touches the DOM by id                      |
 | `src/styles.css`       | All styling. Tokens at the top                                                       |
