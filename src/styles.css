@@ -528,6 +528,7 @@ textarea {
   font: inherit;
   caret-color: var(--lamp);
   resize: none;
+  overflow: hidden;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-radius: 0;

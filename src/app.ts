@@ -253,6 +253,9 @@ function runSelfTest(): void {
 // ---------- keyboard, lamps, path ----------
 function recompute(): void {
   readPanel();
+  // the box grows with the message instead of scrolling inside
+  $.input.style.height = 'auto';
+  $.input.style.height = `${String(Math.max(70, $.input.scrollHeight))}px`;
   const c = settings();
   const m = createMachine(machineConfig(), c.start);
   let out = '';
