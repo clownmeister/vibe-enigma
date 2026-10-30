@@ -31,6 +31,18 @@ Live: https://clownmeister.github.io/vibe-enigma/
 - Prose in markdown passes `python3 scripts/slopcheck.py FILE`: ASCII punctuation, no em dashes, no exclamation marks.
 - The entry is submitted. The board keeps the URL, so a deploy updates the entry; never resubmit.
 
+## Skills
+
+| Skill         | Use for                                                                                |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `screenshot`  | Laptop and phone captures of the page before any UI change is called done              |
+| `render-3d`   | Fixed-camera renders of the model at slider positions; the defects software GL exposes |
+| `design-pass` | Critique with the impeccable finish reviewer against the lounge world, then fix        |
+| `board`       | Who is on the lounge board, who updated, competitor captures                           |
+| `deploy`      | Push, wait for Actions, smoke the live page                                            |
+
+Agents used while building: `impeccable:impeccable-finish-reviewer` on opus for design critique. Everything else was done inline.
+
 ## Commands
 
 ```
