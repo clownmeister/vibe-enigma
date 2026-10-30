@@ -98,6 +98,7 @@ h1 small {
 /* the sheet: one intercept on a ruled form */
 .sheet {
   position: relative;
+  touch-action: pan-y;
   z-index: 1;
   color: var(--ink);
   padding: 18px 24px 16px;
@@ -226,6 +227,37 @@ h1 small {
 }
 .nav .spacer {
   flex: 1;
+}
+/* idle auto-advance: a thin bar fills over ten seconds, then the next intercept slides in */
+.auto {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.auto i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: rgba(241, 16, 0, 0.35);
+}
+.auto i.run {
+  width: 100%;
+  transition: width var(--auto-ms, 10000ms) linear;
+}
+.sheet .slide {
+  animation: slide 0.3s ease-out;
+}
+@keyframes slide {
+  from {
+    opacity: 0;
+    transform: translateX(var(--slide-from, 12px));
+  }
+}
+.nav .up {
+  display: none;
 }
 .all {
   display: none;
@@ -662,6 +694,12 @@ footer input:focus {
   .sheet .cipher {
     display: none;
   }
+  .nav .dn {
+    display: none;
+  }
+  .nav .up {
+    display: inline;
+  }
   .sheet .plain {
     padding-right: 0;
   }
@@ -716,5 +754,8 @@ footer input:focus {
   }
   .path .pulse {
     display: none;
+  }
+  .sheet .slide {
+    animation: none;
   }
 }

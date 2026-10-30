@@ -24,6 +24,8 @@ interface Decoded extends Transmission {
 }
 
 const FEED_INTERVAL = 15_000;
+const AUTO_ADVANCE = 10_000;
+const IDLE_AFTER_TOUCH = 30_000;
 const LAMP_ROWS = ['QWERTZUIO', 'ASDFGHJK', 'PYXCVBNML'];
 const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -37,6 +39,7 @@ const state = {
   pinned: false,
   lastLen: 0,
   show: { timer: 0, text: '' },
+  auto: { timer: 0, pausedUntil: 0 },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller names the element type
@@ -61,8 +64,9 @@ const $ = {
   allList: el<HTMLDivElement>('all-list'),
   open: el<HTMLButtonElement>('open'),
   feedStatus: el<HTMLSpanElement>('feed-status'),
-  sheet: document.querySelector('.sheet'),
-  machine: document.querySelector('.machine'),
+  autoBar: el('auto-bar'),
+  sheet: document.querySelector<HTMLElement>('.sheet'),
+  machine: document.querySelector<HTMLElement>('.machine'),
   machineName: el<HTMLSpanElement>('machine-name'),
   reset: el<HTMLButtonElement>('reset'),
   share: el<HTMLButtonElement>('share'),
@@ -292,12 +296,15 @@ async function loadFeed(): Promise<void> {
       fresh: state.seen.size > 0 && !state.seen.has(t.number),
     }));
     list.forEach((t) => state.seen.add(t.number));
-    // stay on the one the reader is looking at, unless they are on the newest
-    const idx = state.pinned ? state.feed.findIndex((t) => t.number === current) : 0;
+    // a fresh intercept takes the sheet unless the reader pinned an older one; otherwise stay put
+    const arrived = state.feed[0]?.fresh === true;
+    const idx = arrived && !state.pinned ? 0 : state.feed.findIndex((t) => t.number === current);
     state.cursor = idx >= 0 ? idx : 0;
+    if (arrived && !state.pinned) scheduleAuto();
     $.feedStatus.textContent = `${String(list.length)} on record`;
     renderSheet();
     renderAll();
+    if (!state.auto.timer) scheduleAuto();
     if (state.feed[0]?.fresh && state.cursor === 0 && $.sheet) {
       $.sheet.classList.remove('flash');
       // a reflow between remove and add restarts the animation
@@ -310,9 +317,17 @@ async function loadFeed(): Promise<void> {
   }
 }
 
-function renderSheet(): void {
+function renderSheet(direction = 0): void {
   const t = state.feed[state.cursor];
   if (!t) return;
+  if (direction !== 0) {
+    for (const node of [$.tPlain, $.tCipher]) {
+      node.classList.remove('slide');
+      node.style.setProperty('--slide-from', `${String(direction * 14)}px`);
+      node.getBoundingClientRect();
+      node.classList.add('slide');
+    }
+  }
   $.tNum.textContent = `Nº ${String(t.number)}`;
   $.tStart.textContent = t.start;
   $.tTime.textContent = t.sentAt ? new Date(t.sentAt).toLocaleTimeString() : '';
@@ -342,6 +357,7 @@ function renderAll(): void {
         state.pinned = i > 0;
         $.allList.classList.remove('open');
         renderSheet();
+        touched();
       };
       row.onclick = pick;
       row.onkeydown = (e): void => {
@@ -356,9 +372,37 @@ function renderAll(): void {
 }
 
 function moveCursor(delta: number): void {
-  state.cursor = Math.max(0, Math.min(state.feed.length - 1, state.cursor + delta));
+  const next = Math.max(0, Math.min(state.feed.length - 1, state.cursor + delta));
+  if (next === state.cursor) return;
+  state.cursor = next;
   state.pinned = state.cursor > 0;
-  renderSheet();
+  renderSheet(delta > 0 ? -1 : 1);
+}
+
+// ---------- idle auto-advance ----------
+// Left alone, the sheet walks through the intercepts every ten seconds. Any
+// touch on it pauses that for half a minute.
+function scheduleAuto(): void {
+  clearTimeout(state.auto.timer);
+  $.autoBar.classList.remove('run');
+  $.autoBar.getBoundingClientRect();
+  if (state.feed.length < 2) return;
+  const wait = Math.max(0, state.auto.pausedUntil - Date.now());
+  state.auto.timer = window.setTimeout(() => {
+    $.autoBar.style.setProperty('--auto-ms', `${String(AUTO_ADVANCE)}ms`);
+    $.autoBar.classList.add('run');
+    state.auto.timer = window.setTimeout(() => {
+      state.cursor = (state.cursor + 1) % state.feed.length;
+      state.pinned = false;
+      renderSheet(-1);
+      scheduleAuto();
+    }, AUTO_ADVANCE);
+  }, wait);
+}
+
+function touched(): void {
+  state.auto.pausedUntil = Date.now() + IDLE_AFTER_TOUCH;
+  scheduleAuto();
 }
 
 // ---------- share link ----------
@@ -460,10 +504,31 @@ function wire(): void {
 
   $.prev.onclick = (): void => {
     moveCursor(1);
+    touched();
   };
   $.next.onclick = (): void => {
     moveCursor(-1);
+    touched();
   };
+  // a horizontal swipe on the sheet pages through the intercepts
+  const swipe = { x: 0, y: 0, active: false };
+  $.sheet?.addEventListener('pointerdown', (e) => {
+    if ((e.target as Element).closest('button,a,.all')) return;
+    swipe.x = e.clientX;
+    swipe.y = e.clientY;
+    swipe.active = true;
+    touched();
+  });
+  $.sheet?.addEventListener('pointerup', (e) => {
+    if (!swipe.active) return;
+    swipe.active = false;
+    const dx = e.clientX - swipe.x,
+      dy = e.clientY - swipe.y;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) moveCursor(dx < 0 ? 1 : -1);
+  });
+  $.sheet?.addEventListener('pointercancel', () => {
+    swipe.active = false;
+  });
   $.all.onclick = (): void => {
     $.allList.classList.toggle('open');
   };
@@ -480,6 +545,7 @@ function wire(): void {
     if ((e.target as Element).matches('input,textarea,select,.drum')) return;
     if (e.key === 'ArrowLeft') moveCursor(1);
     if (e.key === 'ArrowRight') moveCursor(-1);
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') touched();
   });
 
   let resizeTimer = 0;
