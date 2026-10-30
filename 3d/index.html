@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <title>Vibe Enigma · inside</title>
+    <meta
+      name="description"
+      content="The Enigma I in 3D: pull it apart, spin the rotors, follow a letter through the wiring."
+    />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap"
+    />
+    <link rel="stylesheet" href="/src/three/three.css" />
+  </head>
+  <body>
+    <canvas id="stage" aria-label="Enigma I in three dimensions"></canvas>
+    <header>
+      <h1><a href="../">Vibe Enigma</a> <span>inside</span></h1>
+      <p id="status">LOADING MACHINE</p>
+    </header>
+    <aside class="panel">
+      <label for="explode">Pull apart <output id="explode-out">0</output></label>
+      <input type="range" id="explode" min="0" max="100" value="0" />
+      <label for="msg">Message</label>
+      <textarea
+        id="msg"
+        rows="2"
+        spellcheck="false"
+        autocapitalize="characters"
+        placeholder="TYPE A LETTER"
+      ></textarea>
+      <div class="readout"><span id="route"></span></div>
+      <div class="hint">Drag to orbit · wheel to zoom · rotors at <b id="pos">AAA</b></div>
+    </aside>
+    <script type="module" src="/src/three/main.ts"></script>
+  </body>
+</html>
